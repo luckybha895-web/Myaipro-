@@ -1,5 +1,13 @@
 export const BUILD_MODELS = [
   {
+    id: "my-ai-pro-1-1",
+    label: "My AI Pro 1.1 (Flagship Multimodal SOTA)",
+    tag: "My AI Pro Official SOTA",
+    description:
+      "Flagship multimodal intelligence architecture built by Bhavyash Redd. Ultra-fast conversational reasoning, live multi-engine search grounding, 4K visual synthesis, and full-stack autonomous execution.",
+    available: true,
+  },
+  {
     id: "qwen-code-sota",
     label: "Qwen Code Engine (QwenLM/qwen-code)",
     tag: "QwenLM Official SOTA",
@@ -8,16 +16,16 @@ export const BUILD_MODELS = [
     available: true,
   },
   {
-    id: "creative-ultra-titan",
-    label: "Creative Ultra Titan (Autonomous SOTA)",
+    id: "my-ai-pro-ultra-titan",
+    label: "My AI Pro Ultra Titan (Autonomous SOTA)",
     tag: "Trained Open-Weights SOTA",
     description:
-      "Proprietary fine-tuned model trained on Qwen-2.5-Coder & DeepSeek-Coder-V2.5 weights. Defeats GPT-6, Astra, and Opus 5 on HumanEval (98.6%) and SWE-Bench (74.2%)",
+      "Proprietary fine-tuned model trained on advanced code & reasoning weights. Delivers top-tier code intelligence and full-stack app building.",
     available: true,
   },
   {
-    id: "creative-coder-engine",
-    label: "Creative AI Code Engine",
+    id: "my-ai-pro-coder-engine",
+    label: "My AI Pro Code Engine",
     tag: "Autonomous Coding Engine",
     description:
       "Flagship coding engine optimized for software engineering, 60fps playable game engines, and multi-language full-stack scaffolding",
@@ -72,24 +80,24 @@ export const BUILD_MODELS = [
     available: true,
   },
   {
-    id: "creative-core-neural",
-    label: "Creative AI Trained Neural Model",
+    id: "my-ai-pro-neural",
+    label: "My AI Pro 1.1 Trained Neural Model",
     tag: "Trained Open Architecture",
     description:
-      "Our owned model trained with multi-engine real-time retrieval across Google, Wikipedia, and web databases",
+      "Our flagship model trained with multi-engine real-time retrieval across Google, Wikipedia, and web databases",
     available: true,
   },
   {
-    id: "creative-researcher",
-    label: "Creative AI Deep Researcher",
+    id: "my-ai-pro-researcher",
+    label: "My AI Pro Deep Researcher",
     tag: "Multi-Engine Research",
     description:
       "Autonomous empirical investigations synthesizing Google Search, Wikipedia knowledge, and web sources",
     available: true,
   },
   {
-    id: "creative-studio",
-    label: "Creative AI Presentation Engine",
+    id: "my-ai-pro-studio",
+    label: "My AI Pro Presentation Engine",
     tag: "Decks & Storytelling",
     description:
       "High-impact executive presentation decks, structured narratives, and aesthetic visual concepts",

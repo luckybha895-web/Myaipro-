@@ -33,16 +33,16 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/app/coding")({
   head: () => ({
     meta: [
-      { title: "AI Coding Studio — Creative AI" },
+      { title: "AI Coding Studio — My AI Pro" },
       {
         name: "description",
         content:
-          "Professional AI code generation, debugging, refactoring, and live sandbox powered by open-source models.",
+          "Professional AI code generation, debugging, refactoring, and live sandbox powered by My AI Pro 1.1 and open-source models.",
       },
       { property: "og:title", content: "AI Coding Studio" },
       {
         property: "og:description",
-        content: "High-performance coding with Qwen, DeepSeek, and Creative AI Code Engine.",
+        content: "High-performance coding with My AI Pro 1.1, Qwen, and DeepSeek.",
       },
     ],
   }),
@@ -56,7 +56,7 @@ type CodeFile = {
   code: string;
 };
 
-const STARTER_FILES: Record<string, CodeFile[]> = {
+const STARTER_FILES: Record<"react" | "python" | "html" | "sql", CodeFile[]> = {
   react: [
     {
       id: "app-tsx",
@@ -278,14 +278,14 @@ const OPEN_SOURCE_MODELS = [
     desc: "Blazing fast deterministic code generation",
   },
   {
-    id: "gemini-3.8-flash",
-    name: "Creative AI Code Engine (Ultra)",
-    tag: "Creative SOTA",
-    desc: "High-speed multi-lingual autonomous coder",
+    id: "my-ai-pro-1-1",
+    name: "My AI Pro 1.1 (Ultra Code Engine)",
+    tag: "Flagship SOTA",
+    desc: "High-speed multi-lingual autonomous coder and architect",
   },
   {
-    id: "gemini-3.1-pro-preview",
-    name: "Creative AI Deep Reasoning Architecture",
+    id: "my-ai-pro-reasoning",
+    name: "My AI Pro Deep Reasoning Architecture",
     tag: "Deep Reasoning",
     desc: "Complex multi-file refactoring and bug resolution",
   },
@@ -297,7 +297,7 @@ export function CodingStudio() {
   const [selectedLanguage, setSelectedLanguage] = useState<"react" | "python" | "html" | "sql">(
     "react",
   );
-  const [files, setFiles] = useState<CodeFile[]>(STARTER_FILES.react);
+  const [files, setFiles] = useState<CodeFile[]>(STARTER_FILES["react"]);
   const [activeFileId, setActiveFileId] = useState<string>("app-tsx");
   const [prompt, setPrompt] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
@@ -309,14 +309,22 @@ export function CodingStudio() {
   ]);
   const [previewKey, setPreviewKey] = useState(0);
 
-  const activeFile = files.find((f) => f.id === activeFileId) || files[0];
+  const fallbackFile: CodeFile = {
+    id: "app-tsx",
+    name: "App.tsx",
+    language: "typescript",
+    code: "",
+  };
+  const activeFile: CodeFile = files.find((f) => f.id === activeFileId) ?? files[0] ?? fallbackFile;
 
   // Update active files when language switches
   function handleLanguageSwitch(lang: "react" | "python" | "html" | "sql") {
     setSelectedLanguage(lang);
-    const newFiles = STARTER_FILES[lang] || STARTER_FILES.react;
+    const newFiles = STARTER_FILES[lang] ?? STARTER_FILES["react"];
     setFiles(newFiles);
-    setActiveFileId(newFiles[0].id);
+    if (newFiles.length > 0 && newFiles[0]) {
+      setActiveFileId(newFiles[0].id);
+    }
     addLog(`Switched environment to ${lang.toUpperCase()} suite.`);
   }
 
@@ -388,7 +396,7 @@ CRITICAL RULES:
       } else {
         // Extract code from fence if present
         const match = responseText.match(/```(?:[a-zA-Z0-9_-]+)?\s*([\s\S]*?)```/);
-        const extractedCode = match ? match[1].trim() : responseText.trim();
+        const extractedCode = match && match[1] ? match[1].trim() : responseText.trim();
 
         if (extractedCode.length > 20) {
           handleCodeChange(extractedCode);

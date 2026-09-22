@@ -1,5 +1,5 @@
 {
-  "name": "Creative AI Pro",
+  "name": "My AI Pro",
   "description": "Next-generation multimodal AI workspace for intelligent chat, autonomous app building, live voice companion, presentations, and deep research.",
   "requestFramePermissions": ["microphone", "camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

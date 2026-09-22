@@ -34,14 +34,14 @@ async function checkSingleDomain(domainName: string): Promise<DomainAvailability
     .replace(/^https?:\/\//, "")
     .replace(/\/.*$/, "");
   const parts = clean.split(".");
-  const tld = parts.length > 1 ? parts[parts.length - 1] : "com";
+  const tld = (parts.length > 1 ? parts[parts.length - 1] : "com") || "com";
   const pricing = TLD_PRICES[tld] || { price: "$12.99/yr", currency: "USD" };
 
   const registrarUrl = `https://www.godaddy.com/domainsearch/find?checkAvail=1&domainToCheck=${encodeURIComponent(clean)}`;
 
   // 1. Check if GoDaddy API Key is configured in environment
-  const godaddyKey = process.env.GODADDY_API_KEY;
-  const godaddySecret = process.env.GODADDY_API_SECRET;
+  const godaddyKey = process.env["GODADDY_API_KEY"];
+  const godaddySecret = process.env["GODADDY_API_SECRET"];
 
   if (godaddyKey && godaddySecret) {
     try {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import {
   Sparkles,
@@ -14,6 +14,13 @@ import {
   ExternalLink,
   Laptop,
   Terminal,
+  History,
+  Trash2,
+  X,
+  Zap,
+  Crown,
+  ArrowUpRight,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -32,40 +39,64 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { getUserMemory } from "@/lib/user-memory";
+import {
+  getUnifiedHistory,
+  deleteUnifiedHistoryItem,
+  clearAllUnifiedHistory,
+  UNIFIED_HISTORY_EVENT,
+  type UnifiedHistoryItem,
+} from "@/lib/unified-history";
+import {
+  getSubscription,
+  SUBSCRIPTION_EVENT,
+  SUBSCRIPTION_PLANS,
+  formatINR,
+  type UserSubscriptionState,
+} from "@/lib/subscription";
+import { OnboardingPlanDialog } from "./OnboardingPlanDialog";
+import { PaymentModal } from "./PaymentModal";
 import { toast } from "sonner";
-
-interface LocalProjectSummary {
-  id: string;
-  title: string;
-  created_at?: string;
-}
 
 export function AppSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, username, signOut } = useAuth();
   const { state } = useSidebar();
-  const [projects, setProjects] = useState<LocalProjectSummary[]>([]);
+  const [historyItems, setHistoryItems] = useState<UnifiedHistoryItem[]>([]);
   const [memorySummary, setMemorySummary] = useState<string>("");
+  const [subscription, setSubscription] = useState<UserSubscriptionState>(() =>
+    getSubscription(user?.id || user?.email)
+  );
+  const [planDialogOpen, setPlanDialogOpen] = useState(false);
+  const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+
+  const refreshHistory = useCallback(() => {
+    setHistoryItems(getUnifiedHistory().slice(0, 15));
+  }, []);
+
+  const refreshSubscription = useCallback(() => {
+    setSubscription(getSubscription(user?.id || user?.email));
+  }, [user?.id, user?.email]);
 
   useEffect(() => {
-    // Load local workspace projects
-    try {
-      const raw = localStorage.getItem("creative_ai_local_projects");
-      if (raw) {
-        const parsed = JSON.parse(raw) as Record<
-          string,
-          { id: string; title: string; created_at?: string }
-        >;
-        const list = Object.values(parsed)
-          .sort(
-            (a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime(),
-          )
-          .slice(0, 6);
-        setProjects(list);
-      }
-    } catch {
-      /* ignore */
+    refreshHistory();
+    refreshSubscription();
+
+    const handleUpdate = () => refreshHistory();
+    const handleSubUpdate = () => refreshSubscription();
+
+    window.addEventListener(UNIFIED_HISTORY_EVENT, handleUpdate);
+    window.addEventListener(SUBSCRIPTION_EVENT, handleSubUpdate);
+    window.addEventListener("storage", handleSubUpdate);
+
+    // Prompt user on first login or if they haven't chosen a plan yet
+    const currentSub = getSubscription(user?.id || user?.email);
+    if (!currentSub.hasChosenInitialPlan) {
+      // Small timeout so DOM renders smoothly
+      const timer = setTimeout(() => {
+        setPlanDialogOpen(true);
+      }, 600);
+      return () => clearTimeout(timer);
     }
 
     // Check user memory context
@@ -75,7 +106,13 @@ export function AppSidebar() {
     } else {
       setMemorySummary("Active");
     }
-  }, [user?.id, user?.email]);
+
+    return () => {
+      window.removeEventListener(UNIFIED_HISTORY_EVENT, handleUpdate);
+      window.removeEventListener(SUBSCRIPTION_EVENT, handleSubUpdate);
+      window.removeEventListener("storage", handleSubUpdate);
+    };
+  }, [user?.id, user?.email, refreshHistory, refreshSubscription]);
 
   const navItems = [
     {
@@ -107,6 +144,54 @@ export function AppSidebar() {
     },
   ];
 
+  function getToolMeta(tool: UnifiedHistoryItem["tool"]) {
+    switch (tool) {
+      case "presentation":
+        return {
+          icon: Presentation,
+          iconColor: "text-amber-500",
+          badgeBg: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+          label: "Presentation",
+        };
+      case "voice":
+        return {
+          icon: Mic,
+          iconColor: "text-emerald-500",
+          badgeBg: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+          label: "Voice",
+        };
+      case "chat":
+        return {
+          icon: Bot,
+          iconColor: "text-purple-500",
+          badgeBg: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+          label: "Chat",
+        };
+      case "build":
+      default:
+        return {
+          icon: Code2,
+          iconColor: "text-cyan-500",
+          badgeBg: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+          label: "Builder",
+        };
+    }
+  }
+
+  function handleDeleteItem(e: React.MouseEvent, item: UnifiedHistoryItem) {
+    e.preventDefault();
+    e.stopPropagation();
+    deleteUnifiedHistoryItem(item);
+    refreshHistory();
+    toast.success("Removed from history");
+  }
+
+  function handleClearHistory() {
+    clearAllUnifiedHistory();
+    refreshHistory();
+    toast.success("Unified history cleared");
+  }
+
   async function handleSignOut() {
     await signOut();
     toast.success("Signed out of workspace");
@@ -131,10 +216,10 @@ export function AppSidebar() {
                 </div>
                 <div className="flex flex-col gap-0.5 leading-none">
                   <span className="font-display text-sm font-bold tracking-tight">
-                    Creative <span className="brand-text">AI</span>
+                    My <span className="brand-text">AI Pro</span>
                   </span>
                   <span className="text-[10px] text-muted-foreground font-mono">
-                    Workspace • Pro
+                    Workspace • Enterprise
                   </span>
                 </div>
               </Link>
@@ -177,54 +262,71 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Workspace Projects Section */}
+        {/* Unified History Section across all tools */}
         <SidebarGroup className="mt-2">
           <div className="flex items-center justify-between px-2 pb-1">
-            <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 p-0">
-              Recent Projects
+            <SidebarGroupLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80 p-0 flex items-center gap-1.5">
+              <History className="size-3 text-muted-foreground" />
+              <span>History</span>
             </SidebarGroupLabel>
-            <button
-              onClick={() => navigate({ to: "/app" })}
-              className="text-muted-foreground hover:text-foreground transition-colors p-1"
-              title="New Project"
-              aria-label="Create new project"
-            >
-              <Plus className="size-3.5" />
-            </button>
+            {historyItems.length > 0 && (
+              <button
+                onClick={handleClearHistory}
+                className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                title="Clear all history"
+                aria-label="Clear all history"
+              >
+                <Trash2 className="size-3" />
+              </button>
+            )}
           </div>
           <SidebarGroupContent>
             <SidebarMenu>
-              {projects.length === 0 ? (
+              {historyItems.length === 0 ? (
                 <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    className="text-xs text-muted-foreground hover:text-foreground px-2.5"
-                  >
-                    <Link to="/app">
-                      <Plus className="size-3.5 text-primary" />
-                      <span>Create first app</span>
-                    </Link>
-                  </SidebarMenuButton>
+                  <div className="px-2.5 py-3 text-center rounded-lg border border-dashed border-border/60 bg-muted/20">
+                    <p className="text-[11px] text-muted-foreground">No unified history yet.</p>
+                    <p className="text-[10px] text-muted-foreground/70 mt-0.5">
+                      Activity from Builder, Chat, Voice, & Presentations will appear here.
+                    </p>
+                  </div>
                 </SidebarMenuItem>
               ) : (
-                projects.map((proj) => (
-                  <SidebarMenuItem key={proj.id}>
-                    <SidebarMenuButton
-                      asChild
-                      tooltip={proj.title}
-                      className="px-2.5 text-xs text-muted-foreground hover:text-foreground"
-                    >
-                      <Link
-                        to="/app/project/$projectId"
-                        params={{ projectId: proj.id }}
-                        className="flex items-center gap-2 truncate"
-                      >
-                        <FolderCode className="size-3.5 shrink-0 text-cyan-500/80" />
-                        <span className="truncate flex-1">{proj.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))
+                historyItems.map((item) => {
+                  const meta = getToolMeta(item.tool);
+                  const Icon = meta.icon;
+                  return (
+                    <SidebarMenuItem key={`${item.tool}-${item.id}`}>
+                      <div className="group/item relative flex items-center w-full rounded-lg hover:bg-muted/60 transition-colors">
+                        <SidebarMenuButton
+                          asChild
+                          tooltip={`${item.title} (${meta.label})`}
+                          className="px-2.5 py-1.5 text-xs flex-1 truncate pr-7"
+                        >
+                          <Link to={item.url} className="flex items-center gap-2 truncate">
+                            <Icon className={`size-3.5 shrink-0 ${meta.iconColor}`} />
+                            <span className="truncate flex-1 font-medium text-foreground/90">
+                              {item.title}
+                            </span>
+                            <span
+                              className={`rounded px-1.5 py-0.5 text-[9px] font-semibold shrink-0 ${meta.badgeBg}`}
+                            >
+                              {meta.label}
+                            </span>
+                          </Link>
+                        </SidebarMenuButton>
+                        <button
+                          onClick={(e) => handleDeleteItem(e, item)}
+                          className="absolute right-1 opacity-0 group-hover/item:opacity-100 p-1 text-muted-foreground hover:text-destructive transition-opacity rounded"
+                          title="Remove from history"
+                          aria-label={`Remove ${item.title} from history`}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </div>
+                    </SidebarMenuItem>
+                  );
+                })
               )}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -248,8 +350,71 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* Sidebar Footer: User Profile & Controls */}
-      <SidebarFooter className="border-t border-border/50 p-2">
+      {/* Sidebar Footer: Subscription Upgrade Card & User Profile */}
+      <SidebarFooter className="border-t border-border/50 p-2 space-y-2">
+        {/* Subscription & Token Bar atop Email ID */}
+        <div className="rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/40 p-2.5 space-y-2 shadow-xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className={`size-2 rounded-full ${subscription.planId === "free" ? "bg-amber-500" : "bg-emerald-500 animate-pulse"}`} />
+              <span className="text-xs font-bold text-foreground">
+                {SUBSCRIPTION_PLANS.find((p) => p.id === subscription.planId)?.name || "Free Trial"}
+              </span>
+            </div>
+            <span className="text-[10px] font-extrabold text-primary font-mono">
+              {formatINR(SUBSCRIPTION_PLANS.find((p) => p.id === subscription.planId)?.priceINR || 0)}
+            </span>
+          </div>
+
+          {/* Token Usage Bar */}
+          <div className="space-y-1">
+            <div className="flex justify-between text-[10px] text-muted-foreground">
+              <span>Tokens Used</span>
+              <span className="font-mono font-medium text-foreground">
+                {subscription.tokensUsed.toLocaleString()} / {subscription.tokensLimit.toLocaleString()}
+              </span>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  subscription.tokensUsed >= subscription.tokensLimit
+                    ? "bg-destructive"
+                    : subscription.tokensUsed / subscription.tokensLimit > 0.8
+                      ? "bg-amber-500"
+                      : "brand-bg"
+                }`}
+                style={{
+                  width: `${Math.min(100, Math.round((subscription.tokensUsed / Math.max(1, subscription.tokensLimit)) * 100))}%`,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Upgrade CTA for Free tier or limit reached */}
+          {subscription.planId === "free" || subscription.tokensUsed >= subscription.tokensLimit ? (
+            <button
+              type="button"
+              onClick={() => setPlanDialogOpen(true)}
+              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg brand-bg text-primary-foreground font-bold text-[11px] shadow-sm hover:opacity-95 transition-all cursor-pointer group"
+            >
+              <div className="flex items-center gap-1.5">
+                <Crown className="size-3.5 text-amber-300" />
+                <span>{subscription.tokensUsed >= subscription.tokensLimit ? "Limit Reached • Upgrade" : "Upgrade from ₹199"}</span>
+              </div>
+              <ArrowUpRight className="size-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setPlanDialogOpen(true)}
+              className="w-full flex items-center justify-between px-2 py-1 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground text-[10px] font-semibold transition-colors cursor-pointer"
+            >
+              <span>Manage Subscription</span>
+              <ChevronRight className="size-3" />
+            </button>
+          )}
+        </div>
+
         <SidebarMenu>
           <SidebarMenuItem>
             <div className="flex items-center justify-between gap-2 p-1.5">
@@ -262,7 +427,7 @@ export function AppSidebar() {
                   />
                 ) : (
                   <div className="flex size-7 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">
-                    {(username || user?.email || "U")[0].toUpperCase()}
+                    {(username || user?.email || "U").charAt(0).toUpperCase()}
                   </div>
                 )}
                 <div className="flex flex-col truncate leading-none">
@@ -278,7 +443,7 @@ export function AppSidebar() {
                 <button
                   onClick={handleSignOut}
                   title="Sign out"
-                  className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors cursor-pointer"
                 >
                   <LogOut className="size-3.5" />
                 </button>
@@ -289,6 +454,27 @@ export function AppSidebar() {
       </SidebarFooter>
 
       <SidebarRail />
+
+      {/* Onboarding / Plan Selection Dialog */}
+      <OnboardingPlanDialog
+        open={planDialogOpen}
+        onOpenChange={setPlanDialogOpen}
+        userId={user?.id || user?.email}
+        onPlanSelected={() => {
+          refreshSubscription();
+        }}
+      />
+
+      {/* Payment Gateway Modal */}
+      <PaymentModal
+        open={paymentModalOpen}
+        onOpenChange={setPaymentModalOpen}
+        selectedPlan={SUBSCRIPTION_PLANS[1]}
+        userId={user?.id || user?.email}
+        onSuccess={() => {
+          refreshSubscription();
+        }}
+      />
     </Sidebar>
   );
 }

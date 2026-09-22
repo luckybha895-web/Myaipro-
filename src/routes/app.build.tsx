@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { GeneratedProject } from "@/lib/project-types";
 import { synthesizeAutonomousResponse } from "@/lib/neural-engine";
+import { notifyUnifiedHistoryUpdated } from "@/lib/unified-history";
 
 type Q = { question: string; options: string[] };
 
@@ -1120,9 +1121,8 @@ function Build() {
 
           if (!error && data?.id) {
             targetProjectId = data.id;
-            await supabase
-              .from("project_versions")
-              .insert({
+            try {
+              await supabase.from("project_versions").insert({
                 project_id: data.id,
                 user_id: authUserId,
                 version_number: 1,
@@ -1130,8 +1130,10 @@ function Build() {
                 description: `${project.description ?? ""}\n\n<!--PREVIEW-->\n${project.preview_html ?? ""}`,
                 files: project.files ?? [],
                 model_id: selectedModel,
-              })
-              .catch(() => {});
+              });
+            } catch {
+              /* ignore versioning error */
+            }
           }
         } catch (dbErr) {
           console.warn("Supabase insert error, relying on local persistence:", dbErr);
@@ -1157,6 +1159,7 @@ function Build() {
           created_at: new Date().toISOString(),
         };
         localStorage.setItem("creative_ai_local_projects", JSON.stringify(localProjects));
+        notifyUnifiedHistoryUpdated();
       } catch (lsErr) {
         console.warn("LocalStorage save error:", lsErr);
       }

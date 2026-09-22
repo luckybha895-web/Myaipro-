@@ -48,10 +48,10 @@ interface AgentChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  action?: AgentDeviceAction;
-  images?: Array<{ url: string; title: string }>;
-  videos?: Array<{ url: string; title: string; thumbnail: string; videoId: string }>;
-  sources?: Array<{ title: string; url: string; snippet?: string }>;
+  action?: AgentDeviceAction | undefined;
+  images?: Array<{ url: string; title: string }> | undefined;
+  videos?: Array<{ url: string; title: string; thumbnail: string; videoId: string }> | undefined;
+  sources?: Array<{ title: string; url: string; snippet?: string }> | undefined;
 }
 
 const uid = () => Math.random().toString(36).slice(2, 9);
@@ -94,7 +94,7 @@ function AgentPage() {
         userText.match(/message\s+([A-Za-z]+)/i) ||
         userText.match(/to\s+([A-Za-z]+)/i) ||
         userText.match(/friend\s+([A-Za-z]+)/i);
-      const recipient = friendMatch ? friendMatch[1] : "Alex";
+      const recipient = friendMatch && friendMatch[1] ? friendMatch[1] : "Alex";
 
       const appType = textLower.includes("whatsapp") ? "whatsapp" : "messages";
       const messageBody =
@@ -208,8 +208,8 @@ function AgentPage() {
       const fromMatch = userText.match(/from\s+([A-Za-z\s]+?)\s+to/i);
       const toMatch = userText.match(/to\s+([A-Za-z\s]+)/i);
 
-      const fromCity = fromMatch ? fromMatch[1].trim() : "New York (JFK)";
-      const toCity = toMatch ? toMatch[1].trim() : "London (LHR)";
+      const fromCity = fromMatch && fromMatch[1] ? fromMatch[1].trim() : "New York (JFK)";
+      const toCity = toMatch && toMatch[1] ? toMatch[1].trim() : "London (LHR)";
 
       saveAgentMemory(
         "preference",
@@ -317,7 +317,7 @@ function AgentPage() {
           /buy\s+(?:a\s+|an\s+|some\s+)?([A-Za-z0-9\s]+?)(?:\s+on|\s+from|\s+online|$)/i,
         );
 
-      const targetItem = itemMatch ? itemMatch[1].trim() : "Custom Item";
+      const targetItem = itemMatch && itemMatch[1] ? itemMatch[1].trim() : "Custom Item";
       const storeName = textLower.includes("doordash")
         ? "DoorDash"
         : textLower.includes("ubereats")

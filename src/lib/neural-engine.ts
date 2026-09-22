@@ -2,15 +2,15 @@
 // Integrates official QwenLM/qwen-code repository architecture for autonomous polyglot code synthesis,
 // repository refactoring, 60 FPS Canvas games, and full-stack project building when external API quotas are reached.
 
-export type Citation = { title: string; url: string; snippet?: string };
+export type Citation = { title: string; url: string; snippet?: string | undefined };
 
 export type NeuralSynthesisInput = {
   messages: Array<{ role: "system" | "user" | "assistant"; content: unknown }>;
   mode: "chat" | "research" | "coding" | "presentations" | "build" | "voice" | "agent";
-  persona?: string;
+  persona?: string | undefined;
   citations: Citation[];
   knowledgeContext: string;
-  system?: string;
+  system?: string | undefined;
 };
 
 export type NeuralSynthesisOutput = {
@@ -22,7 +22,7 @@ export type NeuralSynthesisOutput = {
 function extractLatestUserQuery(messages: Array<{ role: string; content: unknown }>): string {
   for (let i = messages.length - 1; i >= 0; i--) {
     const m = messages[i];
-    if (m.role === "user") {
+    if (m && m.role === "user") {
       if (typeof m.content === "string") return m.content;
       if (Array.isArray(m.content)) {
         for (const item of m.content) {
@@ -35,6 +35,142 @@ function extractLatestUserQuery(messages: Array<{ role: string; content: unknown
     }
   }
   return "";
+}
+
+function extractConversationHistory(messages: Array<{ role: string; content: unknown }>): {
+  prevAssistant: string;
+  prevUser: string;
+} {
+  let prevAssistant = "";
+  let prevUser = "";
+  let currentIdx = messages.length - 1;
+
+  while (currentIdx >= 0) {
+    const item = messages[currentIdx];
+    if (item && item.role === "user") {
+      break;
+    }
+    currentIdx--;
+  }
+  currentIdx--;
+
+  while (currentIdx >= 0) {
+    const m = messages[currentIdx];
+    if (m) {
+      if (!prevAssistant && m.role === "assistant") {
+        if (typeof m.content === "string") {
+          prevAssistant = m.content;
+        }
+      } else if (prevAssistant && !prevUser && m.role === "user") {
+        if (typeof m.content === "string") {
+          prevUser = m.content;
+        } else if (Array.isArray(m.content)) {
+          for (const item of m.content) {
+            if (item && typeof item === "object" && "text" in item) {
+              prevUser = String((item as { text: unknown }).text);
+              break;
+            }
+          }
+        }
+      }
+    }
+    if (prevAssistant && prevUser) break;
+    currentIdx--;
+  }
+
+  return { prevAssistant, prevUser };
+}
+
+function handlePromptOrFollowUpSynthesis(
+  query: string,
+  qLower: string,
+  prevAssistant: string,
+  prevUser: string,
+): NeuralSynthesisOutput | null {
+  // 1. Follow-up: Make it small / shorten / condense
+  const isShorten =
+    /\b(make it small|make it smaller|make it short|make it shorter|shorten it|make it concise|reduce it|make it brief|condense it|summarize it|cut it down|make smaller|make shorter)\b/i.test(
+      qLower,
+    );
+
+  if (isShorten && prevAssistant) {
+    let coreText = "";
+    const bqMatch = prevAssistant.match(/>\s*\*?\*?([^\n>]+)\*?\*?/);
+    const codeMatch = prevAssistant.match(/```[a-z]*\n([\s\S]+?)```/i);
+    const boldMatch = prevAssistant.match(/\*\*([^*]+)\*\*/);
+
+    if (bqMatch && bqMatch[1]) {
+      coreText = bqMatch[1].trim();
+    } else if (codeMatch && codeMatch[1]) {
+      coreText = codeMatch[1].trim().slice(0, 300);
+    } else if (boldMatch && boldMatch[1] && boldMatch[1].length > 15) {
+      coreText = boldMatch[1].trim();
+    } else {
+      const firstSentence = prevAssistant.split(/(?<=[.?!])\s+/)[0] || prevAssistant;
+      coreText = firstSentence.replace(/[#*`>_-]/g, "").trim();
+    }
+
+    const condensed = coreText
+      .replace(
+        /\b(masterpiece|hyperrealistic|photorealistic|high resolution|8k|4k|octane render|cinematic lighting|ultra detailed|extremely detailed|intricate details|sharp focus)\b/gi,
+        "",
+      )
+      .replace(/\s{2,}/g, " ")
+      .replace(/,\s*,/g, ",")
+      .trim();
+
+    const shortPrompt = condensed.length > 10 ? condensed : coreText.slice(0, 80);
+
+    return {
+      text: `### ✂️ Condensed Prompt (Small & Focused)\n\n> **${shortPrompt}**\n\n*Optimized to be concise, lightweight, and impactful while preserving the essential subject and style from our previous response.*`,
+      sources: [],
+      grounded: false,
+    };
+  }
+
+  // 2. Follow-up: Make it longer / expand
+  const isExpand =
+    /\b(make it long|make it longer|expand it|more detail|more details|elaborate|expand on this|make it bigger)\b/i.test(
+      qLower,
+    );
+
+  if (isExpand && prevAssistant) {
+    const coreText = prevAssistant
+      .replace(/[#*`>_-]/g, "")
+      .trim()
+      .slice(0, 250);
+    return {
+      text: `### 🔍 Detailed & Expanded Specification\n\nBased on your previous request (*${prevUser || "conversation"}*), here is an expanded, in-depth breakdown:\n\n### 1. Primary Subject & Composition\n${coreText}\n\n### 2. Calibrated Technical Parameters\n- **Lighting & Atmosphere**: Natural volumetric lighting with soft directional bounce and subtle rim highlights.\n- **Depth & Optics**: Dynamic focal range isolating key elements with organic environmental bokeh.\n- **Color Grading**: Accurate chromatic grading preserving authentic dynamic range.\n- **Execution Polish**: Production-grade fidelity with clean borders and zero synthetic artifacts.\n\n*Feel free to ask for further modifications, code translations, or condensed variants anytime!*`,
+      sources: [],
+      grounded: false,
+    };
+  }
+
+  // 3. User asks to create a prompt
+  const isPromptRequest =
+    /\b(make a prompt|write a prompt|create a prompt|generate a prompt|give me a prompt|craft a prompt|prompt for me)\b/i.test(
+      qLower,
+    );
+
+  if (isPromptRequest) {
+    const subject =
+      query
+        .replace(
+          /^(can you|please|tell me to)?\s*(make a prompt for me|make a prompt|write a prompt for me|write a prompt|create a prompt|generate a prompt|give me a prompt|craft a prompt)\s*(about|for|on)?/i,
+          "",
+        )
+        .trim() || (prevUser ? `inspired by ${prevUser}` : "a futuristic architectural landscape");
+
+    const promptText = `${subject}, authentic natural lighting, lifelike organic textures, atmospheric depth of field, balanced shadows, true-to-life colors, clean composition`;
+
+    return {
+      text: `### 🎨 MyAI Pro Optimized Prompt\n\nHere is a crafted prompt designed for optimal fidelity:\n\n> **${promptText}**\n\n#### ⚙️ Composition & Style Breakdown\n- **Subject**: ${subject}\n- **Lighting**: Natural ambient lighting with soft directional fill\n- **Textures**: Organic, tactile surface detail without synthetic CGI glare\n- **Palette**: Calibrated chromatic balance and realistic contrast\n\n*You can ask me to "make it small" to condense it down, or tweak any visual attribute!*`,
+      sources: [],
+      grounded: false,
+    };
+  }
+
+  return null;
 }
 
 function detectCodeIntent(query: string): boolean {
@@ -60,6 +196,13 @@ export function synthesizeAutonomousResponse(input: NeuralSynthesisInput): Neura
   const qLower = query.toLowerCase();
   const sysLower = (input.system || "").toLowerCase();
   const citations = input.citations || [];
+  const { prevAssistant, prevUser } = extractConversationHistory(input.messages);
+
+  // Context-aware prompt creation and follow-up transformation (e.g. "make it small", "make a prompt for me")
+  const followUpResult = handlePromptOrFollowUpSynthesis(query, qLower, prevAssistant, prevUser);
+  if (followUpResult) {
+    return followUpResult;
+  }
 
   // Detect if JSON output is expected (by mode or system prompt instructions)
   const isJsonExpected =
@@ -1186,9 +1329,10 @@ export function solution() {
 
 export function handlePresentationJsonSynthesis(query: string): NeuralSynthesisOutput {
   const topicMatch = query.match(/Topic:\s*([^.\n]+)/i);
-  const rawTopic = topicMatch
-    ? topicMatch[1].trim()
-    : query.replace(/Make \d+ slides/i, "").trim() || "Strategy & Roadmap";
+  const rawTopic =
+    topicMatch && topicMatch[1]
+      ? topicMatch[1].trim()
+      : query.replace(/Make \d+ slides/i, "").trim() || "Strategy & Roadmap";
   const topic = rawTopic.slice(0, 60);
 
   const countMatch = query.match(/Make (\d+) slides/i);
@@ -1396,9 +1540,10 @@ export function handlePresentationJsonSynthesis(query: string): NeuralSynthesisO
 function solveCalculation(query: string): string | null {
   const clean = query.replace(/[?!=]/g, "").trim();
   const match = clean.match(/^([0-9\s+\-*/().^]+)$/);
-  if (match && /[+\-*/^]/.test(match[1])) {
+  const matchText = match && match[1] ? match[1] : undefined;
+  if (matchText && /[+\-*/^]/.test(matchText)) {
     try {
-      const sanitized = match[1].replace(/\^/g, "**");
+      const sanitized = matchText.replace(/\^/g, "**");
       // safe arithmetic evaluator without arbitrary code execution
       if (/^[0-9\s+\-*/().]+$/.test(sanitized)) {
         const result = new Function(`"use strict"; return (${sanitized})`)();

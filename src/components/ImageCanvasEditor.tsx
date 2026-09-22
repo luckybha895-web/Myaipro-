@@ -708,7 +708,7 @@ export function ImageCanvasEditor({
                         min={-100}
                         max={100}
                         step={1}
-                        onValueChange={([val]) => setBrightness(val)}
+                        onValueChange={([val]) => val !== undefined && setBrightness(val)}
                       />
                     </div>
 
@@ -724,7 +724,7 @@ export function ImageCanvasEditor({
                         min={-100}
                         max={100}
                         step={1}
-                        onValueChange={([val]) => setContrast(val)}
+                        onValueChange={([val]) => val !== undefined && setContrast(val)}
                       />
                     </div>
 
@@ -740,7 +740,7 @@ export function ImageCanvasEditor({
                         min={-100}
                         max={100}
                         step={1}
-                        onValueChange={([val]) => setSaturation(val)}
+                        onValueChange={([val]) => val !== undefined && setSaturation(val)}
                       />
                     </div>
 
@@ -756,7 +756,7 @@ export function ImageCanvasEditor({
                         min={0}
                         max={100}
                         step={1}
-                        onValueChange={([val]) => setSepia(val)}
+                        onValueChange={([val]) => val !== undefined && setSepia(val)}
                       />
                     </div>
 
@@ -772,7 +772,7 @@ export function ImageCanvasEditor({
                         min={0}
                         max={15}
                         step={1}
-                        onValueChange={([val]) => setBlur(val)}
+                        onValueChange={([val]) => val !== undefined && setBlur(val)}
                       />
                     </div>
                   </div>
@@ -902,7 +902,7 @@ export function ImageCanvasEditor({
                       min={1}
                       max={24}
                       step={1}
-                      onValueChange={([val]) => setStrokeWidth(val)}
+                      onValueChange={([val]) => val !== undefined && setStrokeWidth(val)}
                     />
                   </div>
 

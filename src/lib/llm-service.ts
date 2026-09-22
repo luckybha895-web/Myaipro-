@@ -351,10 +351,14 @@ export function isCodingPrompt(
 
 // UNIFIED LLM SERVICE REGISTRY & ROUTER
 export class LLMService {
+  private static qwenProvider: LLMProviderSpec = new QwenCodeLLMProvider();
+  private static geminiProvider: LLMProviderSpec = new GeminiMultimodalLLMProvider();
+  private static deepseekProvider: LLMProviderSpec = new DeepSeekLLMProvider();
+
   private static providers: LLMProviderSpec[] = [
-    new QwenCodeLLMProvider(),
-    new GeminiMultimodalLLMProvider(),
-    new DeepSeekLLMProvider(),
+    LLMService.qwenProvider,
+    LLMService.geminiProvider,
+    LLMService.deepseekProvider,
   ];
 
   /**
@@ -392,18 +396,16 @@ export class LLMService {
     // Specialized Routing Interception
     if (isCoding) {
       // Exclusively route coding prompts to Qwen-Code SOTA engine
-      const qwenProvider = this.providers[0]; // QwenCodeLLMProvider
       return {
-        provider: qwenProvider,
+        provider: this.qwenProvider,
         model: "qwen-code-sota",
         isCodingInterception: true,
       };
     }
 
     // Default to Standard General Chat LLM (Gemini Multimodal)
-    const generalProvider = this.providers[1]; // GeminiMultimodalLLMProvider
     return {
-      provider: generalProvider,
+      provider: this.geminiProvider,
       model: "gemini-3.8-flash",
       isCodingInterception: false,
     };
@@ -412,7 +414,7 @@ export class LLMService {
   /** Get provider for a given model ID or task type */
   static getProvider(modelId?: string): LLMProviderSpec {
     if (!modelId) {
-      return this.providers[0]; // Default to Qwen Code provider
+      return this.qwenProvider; // Default to Qwen Code provider
     }
 
     const lower = modelId.toLowerCase();
@@ -424,13 +426,13 @@ export class LLMService {
 
     // Default matching rules
     if (lower.includes("qwen") || lower.includes("coder") || lower.includes("code")) {
-      return this.providers[0]; // Qwen Code
+      return this.qwenProvider; // Qwen Code
     }
     if (lower.includes("deepseek")) {
-      return this.providers[2]; // DeepSeek
+      return this.deepseekProvider; // DeepSeek
     }
 
-    return this.providers[1]; // Gemini Multimodal
+    return this.geminiProvider; // Gemini Multimodal
   }
 
   /**

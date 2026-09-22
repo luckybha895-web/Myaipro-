@@ -217,15 +217,15 @@ function ProjectView() {
   }, [projectId]);
 
   useEffect(() => {
-    supabase
-      .from("projects")
-      .select("id,title,description,files")
-      .eq("id", projectId)
-      .maybeSingle()
-      .then(({ data }) => {
+    void (async () => {
+      try {
+        const { data } = await supabase
+          .from("projects")
+          .select("id,title,description,files")
+          .eq("id", projectId)
+          .maybeSingle();
         if (data) {
           setRow(data as Row | null);
-          setLoading(false);
         } else {
           // Check local storage fallback
           try {
@@ -239,10 +239,8 @@ function ProjectView() {
           } catch {
             /* ignore */
           }
-          setLoading(false);
         }
-      })
-      .catch(() => {
+      } catch {
         try {
           const localProjects = JSON.parse(
             localStorage.getItem("creative_ai_local_projects") || "{}",
@@ -254,8 +252,10 @@ function ProjectView() {
         } catch {
           /* ignore */
         }
+      } finally {
         setLoading(false);
-      });
+      }
+    })();
     void loadVersions();
   }, [projectId, loadVersions]);
 
@@ -429,8 +429,9 @@ Please update the application code and preview_html to implement the user's requ
         console.warn("askAIJson failed, using neural engine synthesis fallback:", aiErr);
         const synth = synthesizeAutonomousResponse({
           mode: "build",
-          userPrompt: `${row.title}: ${userText}`,
-          modelId: "creative-ai-vibe-engine",
+          messages: [{ role: "user", content: `${row.title}: ${userText}` }],
+          citations: [],
+          knowledgeContext: "",
         });
         if (synth.text) {
           try {
@@ -637,8 +638,8 @@ export async function query<T = any>(sql: string, params: any[] = []): Promise<{
         onClose={() => setViewMode("chat")}
         onRunPreview={() => setViewMode("preview")}
         onSaveFiles={(updatedFiles) => {
-          setFiles(updatedFiles);
-          const newHtml = updatedFiles.find((f) => f.name.endsWith(".html"))?.content;
+          setRow((prev) => (prev ? { ...prev, files: updatedFiles as unknown as Json } : prev));
+          const newHtml = updatedFiles.find((f) => f.name.endsWith(".html"))?.code;
           if (newHtml && row) {
             const newDesc = packDescription(description, newHtml);
             void supabase
@@ -1818,10 +1819,12 @@ export async function query<T = any>(sql: string, params: any[] = []): Promise<{
                     input.type = "file";
                     input.accept = "video/*";
                     input.onchange = (e: Event) => {
-                      const files = (e.target as HTMLInputElement).files;
-                      if (files?.length) {
+                      const fileList = (e.target as HTMLInputElement).files;
+                      if (fileList && fileList.length > 0 && fileList[0]) {
                         toast.success(`Video attached to project`);
-                        setChatInput((prev) => `${prev} [Attached video: ${files[0].name}]`.trim());
+                        setChatInput((prev) =>
+                          `${prev} [Attached video: ${fileList[0]?.name}]`.trim(),
+                        );
                       }
                     };
                     input.click();

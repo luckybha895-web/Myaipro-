@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, useMemo } from "react";
+import { notifyUnifiedHistoryUpdated } from "@/lib/unified-history";
 import {
   Menu,
   Edit3,
@@ -112,7 +113,7 @@ function VoiceCodeBlock({ language, code }: { language: string; code: string }) 
     toast.success("Opening in AI Builder...");
     void navigate({
       to: "/app/build",
-      search: { prompt: `Build app from code:\n${code.slice(0, 300)}` },
+      search: { idea: `Build app from code:\n${code.slice(0, 300)}` },
     });
   }
 
@@ -259,7 +260,7 @@ function FormattedMessageContent({ text }: { text: string }) {
       }
 
       const language = match[1] || "code";
-      const code = match[2];
+      const code = match[2] || "";
       elements.push(<VoiceCodeBlock key={`code-${match.index}`} language={language} code={code} />);
       lastIndex = match.index + match[0].length;
     }
@@ -368,6 +369,7 @@ function VoiceAssistant() {
     setTurns(updated);
     try {
       localStorage.setItem("creative_ai_voice_turns", JSON.stringify(updated.slice(-30)));
+      notifyUnifiedHistoryUpdated();
     } catch {
       /* ignore */
     }
@@ -396,8 +398,11 @@ function VoiceAssistant() {
     const fileNames: string[] = [];
     let totalBytes = 0;
     for (let i = 0; i < files.length; i++) {
-      fileNames.push(files[i].webkitRelativePath || files[i].name);
-      totalBytes += files[i].size;
+      const file = files[i];
+      if (file) {
+        fileNames.push(file.webkitRelativePath || file.name);
+        totalBytes += file.size;
+      }
     }
 
     const sizeFormatted =
@@ -718,7 +723,7 @@ function VoiceAssistant() {
         if (!muted) {
           await speak(replyText, preferredVoice);
         }
-        setTimeout(() => navigate({ to: "/app/presentations" }), 600);
+        setTimeout(() => navigate({ to: "/app/presentations", search: { topic: "" } }), 600);
         return;
       }
 
@@ -742,7 +747,7 @@ function VoiceAssistant() {
         if (!muted) {
           await speak(replyText, preferredVoice);
         }
-        setTimeout(() => navigate({ to: "/app/build" }), 600);
+        setTimeout(() => navigate({ to: "/app/build", search: { idea: "" } }), 600);
         return;
       }
 
@@ -1692,7 +1697,7 @@ function VoiceAssistant() {
 
             <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-800">
               <Link
-                to="/app/images"
+                to="/app/chat"
                 onClick={() => setPhotoStudioOpen(false)}
                 className="text-xs text-purple-400 hover:text-purple-300 flex items-center gap-1"
               >
@@ -1924,7 +1929,7 @@ function VoiceAssistant() {
             <button
               onClick={() => {
                 setActionMenuOpen(false);
-                navigate({ to: "/app/build" });
+                navigate({ to: "/app/build", search: { idea: "" } });
               }}
               className="flex flex-col items-center justify-center p-3 rounded-2xl bg-pink-500/10 border border-pink-500/30 hover:bg-pink-500/20 text-pink-300 transition-all text-center gap-1.5 cursor-pointer"
             >
@@ -1937,7 +1942,7 @@ function VoiceAssistant() {
             <button
               onClick={() => {
                 setActionMenuOpen(false);
-                navigate({ to: "/app/presentations" });
+                navigate({ to: "/app/presentations", search: { topic: "" } });
               }}
               className="flex flex-col items-center justify-center p-3 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-300 transition-all text-center gap-1.5 cursor-pointer"
             >
@@ -2232,7 +2237,7 @@ function VoiceAssistant() {
                   bg: "bg-indigo-500/10",
                   action: () => {
                     setDeviceAppOpen(false);
-                    navigate({ to: "/app/build" });
+                    navigate({ to: "/app/build", search: { idea: "" } });
                   },
                 },
                 {
@@ -2243,7 +2248,7 @@ function VoiceAssistant() {
                   bg: "bg-cyan-500/10",
                   action: () => {
                     setDeviceAppOpen(false);
-                    navigate({ to: "/app/presentations" });
+                    navigate({ to: "/app/presentations", search: { topic: "" } });
                   },
                 },
                 {

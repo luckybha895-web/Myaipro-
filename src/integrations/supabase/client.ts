@@ -173,19 +173,24 @@ function createMockSupabaseClient() {
           },
         };
       },
-      async signInWithPassword({ email }: { email?: string }) {
+      async signInWithPassword({ email }: { email?: string | undefined }) {
+        const userEmail = email || demoUser.email;
+        const prefix = userEmail ? userEmail.split("@")[0] : "creator";
         currentSession = {
           ...demoSession,
           user: {
             ...demoUser,
-            email: email || demoUser.email,
-            user_metadata: { full_name: (email || "creator").split("@")[0] },
+            email: userEmail,
+            user_metadata: { full_name: prefix || "creator", name: prefix || "creator" },
           },
         };
         authListeners.forEach((fn) => fn("SIGNED_IN", currentSession));
-        return { data: { user: currentSession.user, session: currentSession }, error: null };
+        return {
+          data: { user: currentSession ? currentSession.user : null, session: currentSession },
+          error: null,
+        };
       },
-      async signUp({ email }: { email?: string }) {
+      async signUp({ email }: { email?: string | undefined }) {
         return this.signInWithPassword({ email });
       },
       async signInWithOAuth(credentials?: {
@@ -379,7 +384,8 @@ function createSupabaseClient() {
     return { data: { session: null }, error: null };
   };
 
-  realClient.auth.getUser = async (jwt?: string) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (realClient.auth as any).getUser = async (jwt?: string) => {
     try {
       const res = await originalGetUser(jwt);
       if (res.data?.user) return res;
@@ -390,10 +396,14 @@ function createSupabaseClient() {
     if (customUser) {
       return { data: { user: customUser }, error: null };
     }
-    return { data: { user: null }, error: null };
+    return {
+      data: { user: null },
+      error: { name: "AuthError", message: "User not found", status: 400 },
+    };
   };
 
-  realClient.auth.signOut = async (options?: { scope?: "global" | "local" | "others" }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (realClient.auth as any).signOut = async (options?: any) => {
     setCustomAuthUser(null);
     customListeners.forEach((fn) => fn("SIGNED_OUT", null));
     try {
@@ -403,7 +413,8 @@ function createSupabaseClient() {
     }
   };
 
-  realClient.auth.onAuthStateChange = (callback) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (realClient.auth as any).onAuthStateChange = (callback: any) => {
     customListeners.add(callback);
     const sub = originalOnAuthStateChange((event, session) => {
       callback(event, session);
@@ -424,6 +435,8 @@ function createSupabaseClient() {
     return {
       data: {
         subscription: {
+          id: "custom-sub",
+          callback,
           unsubscribe: () => {
             customListeners.delete(callback);
             sub.data.subscription.unsubscribe();

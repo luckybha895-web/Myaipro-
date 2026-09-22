@@ -26,8 +26,9 @@ export interface AgentDeviceAction {
     done: boolean;
     timestamp: string;
   }>;
-  resultSummary?: string;
-  data?: Record<string, unknown>;
+  resultSummary?: string | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  data?: Record<string, any> | undefined;
 }
 
 const STORAGE_KEY = "create_your_ai_agent_memory";

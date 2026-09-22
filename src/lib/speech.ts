@@ -68,7 +68,7 @@ export async function playPcmAudio(base64Data: string, sampleRate = 24000) {
   const buffer = audioCtx.createBuffer(1, int16Array.length, sampleRate);
   const channelData = buffer.getChannelData(0);
   for (let i = 0; i < int16Array.length; i++) {
-    channelData[i] = int16Array[i] / 32768.0;
+    channelData[i] = (int16Array[i] ?? 0) / 32768.0;
   }
 
   const source = audioCtx.createBufferSource();

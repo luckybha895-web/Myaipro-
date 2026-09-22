@@ -66,7 +66,7 @@ export interface ImagePreviewProps {
 
 export const ImagePreview: React.FC<ImagePreviewProps> = ({
   src,
-  alt = "AI generated visual artwork",
+  alt = "MyAI Pro visual artwork",
   title,
   subtitle,
   aspectRatio = "auto",
@@ -74,7 +74,7 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
   zoomScale = 2.2,
   onEdit,
   onShare,
-  badgeText = "AI Masterpiece",
+  badgeText = "MyAI Pro",
   className = "",
 }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -306,12 +306,15 @@ export const ImagePreview: React.FC<ImagePreviewProps> = ({
           {/* Metadata info */}
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground truncate">
-              <Sparkles className="size-3.5 text-purple-500 shrink-0" />
-              <span className="truncate">{title || badgeText}</span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/15 px-2 py-0.5 text-[10px] font-bold tracking-wide text-purple-600 dark:text-purple-400 border border-purple-500/20 shrink-0">
+                <Sparkles className="size-3 text-purple-500" />
+                {badgeText || "MyAI Pro"}
+              </span>
+              <span className="truncate">{title || "Visual Creation"}</span>
             </div>
-            {subtitle && (
-              <div className="text-[11px] text-muted-foreground truncate mt-0.5">{subtitle}</div>
-            )}
+            <div className="text-[11px] text-muted-foreground truncate mt-0.5">
+              {subtitle || "MyAI Pro Visual Engine"}
+            </div>
           </div>
 
           {/* Action Buttons Toolbar */}

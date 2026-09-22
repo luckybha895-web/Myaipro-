@@ -1,7 +1,9 @@
+import { notifyUnifiedHistoryUpdated } from "./unified-history";
+
 export type ChatMediaImage = {
   title: string;
   url: string;
-  source?: string;
+  source?: string | undefined;
 };
 
 export type ChatMediaVideo = {
@@ -15,12 +17,12 @@ export type ChatMsg = {
   id: string;
   role: "user" | "assistant";
   content: string;
-  imageUrl?: string | null;
-  images?: ChatMediaImage[];
-  videos?: ChatMediaVideo[];
-  sources?: Array<{ title: string; url: string }>;
-  grounded?: boolean;
-  rating?: 1 | -1 | null;
+  imageUrl?: string | null | undefined;
+  images?: ChatMediaImage[] | undefined;
+  videos?: ChatMediaVideo[] | undefined;
+  sources?: Array<{ title: string; url: string }> | undefined;
+  grounded?: boolean | undefined;
+  rating?: 1 | -1 | null | undefined;
 };
 
 export type ChatSession = {
@@ -81,6 +83,7 @@ function persistAll(sessions: ChatSession[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
     window.dispatchEvent(new CustomEvent(EVENT_NAME));
+    notifyUnifiedHistoryUpdated();
   } catch (err) {
     console.error("Failed to save chat sessions:", err);
   }

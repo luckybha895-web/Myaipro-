@@ -19,6 +19,7 @@ type Body = {
   mode?: "chat" | "research" | "coding" | "presentations" | "build" | "voice" | "agent";
   image?: boolean;
   search?: boolean;
+  apiKey?: string;
 };
 
 function getGemini(apiKey: string) {
@@ -105,7 +106,9 @@ async function searchWikipedia(query: string): Promise<Citation[]> {
     if (!titles.length) return [];
 
     // Fetch introductory extracts for the top matched article
-    const topTitle = titles[0];
+    const topTitle = titles[0] || "";
+    if (!topTitle) return [];
+
     let extractText = "";
     try {
       const extractUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=extracts&exintro=1&explaintext=1&titles=${encodeURIComponent(topTitle)}&format=json`;
@@ -127,11 +130,12 @@ async function searchWikipedia(query: string): Promise<Citation[]> {
 
     const results: Citation[] = [];
     for (let i = 0; i < titles.length; i++) {
-      if (titles[i]) {
+      const t = titles[i];
+      if (t) {
         results.push({
-          title: titles[i],
-          snippet: i === 0 && extractText ? extractText.slice(0, 450) : titles[i],
-          url: urls[i] || `https://en.wikipedia.org/wiki/${encodeURIComponent(titles[i])}`,
+          title: t,
+          snippet: i === 0 && extractText ? extractText.slice(0, 450) : t,
+          url: urls[i] || `https://en.wikipedia.org/wiki/${encodeURIComponent(t)}`,
         });
       }
     }
@@ -175,8 +179,9 @@ async function searchWebEngines(query: string): Promise<Citation[]> {
         ...html.matchAll(/<a class="result__snippet[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g),
       ];
       for (let i = 0; i < Math.min(4, snippetMatches.length); i++) {
-        const rawSnippet = snippetMatches[i][2] || "";
-        const rawUrl = snippetMatches[i][1] || "";
+        const item = snippetMatches[i];
+        const rawSnippet = (item && item[2]) || "";
+        const rawUrl = (item && item[1]) || "";
         const cleanSnippet = decodeHtmlEntities(rawSnippet);
         const cleanUrl = rawUrl.startsWith("//") ? `https:${rawUrl}` : rawUrl;
         if (cleanSnippet && cleanSnippet.length > 20) {
@@ -393,8 +398,9 @@ async function searchWebVideos(query: string): Promise<WebVideo[]> {
       const seenIds = new Set<string>();
 
       for (let i = 0; i < idMatches.length && videos.length < 4; i++) {
-        const id = idMatches[i][1];
-        if (!seenIds.has(id)) {
+        const idMatch = idMatches[i];
+        const id = idMatch ? idMatch[1] : undefined;
+        if (id && !seenIds.has(id)) {
           seenIds.add(id);
           const rawTitle = titleMatches[i]?.[1] || `${searchTerm} Video`;
           videos.push({
@@ -430,7 +436,7 @@ function parseBase64Image(rawUrl: string): { data: string; mimeType: string } | 
   if (!data) return null;
 
   const mimeMatch = header.match(/data:([^;,]+)/i);
-  const rawMime = mimeMatch ? mimeMatch[1].trim().toLowerCase() : "image/png";
+  const rawMime = mimeMatch && mimeMatch[1] ? mimeMatch[1].trim().toLowerCase() : "image/png";
   const mimeType = rawMime.startsWith("image/") ? rawMime : "image/png";
   return { data, mimeType };
 }
@@ -502,27 +508,29 @@ function generateSvgVisualFallback(prompt: string, isEdit = false): string {
     "${safePrompt}"
   </text>
   <text x="400" y="440" fill="#38bdf8" font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="500" text-anchor="middle">
-    Creative AI Visual Studio • Gemini Engine
+    My AI Pro Visual Studio • SOTA Engine
   </text>
 </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-// Behavioral prompt for our trained AI model: strict adherence to user questions
-const OUR_TRAINED_MODEL_SYSTEM = `You are Creative AI, an accurate, highly intelligent neural model.
-Absolute Directive:
-1. Strict Question Adherence: Answer ONLY what the user asks. Provide a direct, factual, and helpful answer to the user's specific inquiry.
-2. No Irrelevant Tangents: Do not introduce unsolicited topics, generic background essays, or conversational filler unless directly requested.
-3. Live Knowledge Grounding: When live search context (Wikipedia, web search) is provided, synthesize the exact facts needed to directly answer the query with precision.
-4. Coding Precision: When asked for code, output clean, complete, working code with a clear, concise explanation.
-5. Tone: Helpful, direct, polite, and completely focused on the user's question.`;
+// Behavioral prompt for our trained AI model: strict adherence to user questions and explicit model identity
+const OUR_TRAINED_MODEL_SYSTEM = `You are My AI Pro, an accurate, highly intelligent neural model powered by the My AI Pro 1.1 architecture, created and built by Bhavyash Redd.
+Absolute Directives:
+1. Model & Creator Identity: If asked which model you are using or what model you are, explicitly answer: "I am My AI Pro 1.1" (or "I am using My AI Pro 1.1, created and built by Bhavyash Redd"). Your name is "My AI Pro". If asked who created, built, developed, or made you, answer that you were built and created by Bhavyash Redd.
+2. Strict Question Adherence: Answer ONLY what the user asks. Provide a direct, factual, and helpful answer to the user's specific inquiry.
+3. No Irrelevant Tangents: Do not introduce unsolicited topics, generic background essays, or conversational filler unless directly requested.
+4. Live Knowledge Grounding: When live search context (Wikipedia, web search) is provided, synthesize the exact facts needed to directly answer the query with precision.
+5. Coding Precision: When asked for code, output clean, complete, working code with a clear, concise explanation.
+6. Tone: Helpful, direct, polite, and completely focused on the user's question.`;
 
 export const Route = createFileRoute("/api/ai")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        let body: Body | null = null;
         try {
-          const body = (await request.json()) as Body;
+          body = (await request.json()) as Body;
           const apiKey = body.apiKey || process.env["GEMINI_API_KEY"];
           const messages = body.messages ?? [];
 
@@ -608,7 +616,7 @@ export const Route = createFileRoute("/api/ai")({
           const isGenerateImageIntent = isExplicitEditRequest || isExplicitGenerateRequest;
 
           // 1. IMAGE ANALYSIS & MULTIMODAL VISION (When user uploads/attaches an image to analyze or ask about)
-          if (hasImageAttachment && !isExplicitEditRequest) {
+          if (hasImageAttachment && attachedImageBase64 && !isExplicitEditRequest) {
             const visionResult = await handleAnalyzeImage({
               image: attachedImageBase64,
               prompt: userQueryText,
@@ -724,13 +732,15 @@ export const Route = createFileRoute("/api/ai")({
 
           const formatFinalResponse = (baseText: string) => {
             let enrichedText = baseText;
+            const currentMode = body?.mode;
+            const currentSystem = body?.system;
             const isJsonRequested =
-              body.mode === "presentations" ||
-              body.mode === "build" ||
-              body.mode === "coding" ||
-              (body.system && body.system.toLowerCase().includes("json"));
+              currentMode === "presentations" ||
+              currentMode === "build" ||
+              currentMode === "coding" ||
+              (currentSystem && currentSystem.toLowerCase().includes("json"));
 
-            if (body.mode === "voice") {
+            if (currentMode === "voice") {
               // Strip meta search labels, markdown images, citations, and headers for smooth spoken audio
               enrichedText = enrichedText
                 .replace(/^live search results:?\s*/gi, "")
@@ -742,13 +752,15 @@ export const Route = createFileRoute("/api/ai")({
                 .replace(/!\[.*?\]\(.*?\)/g, "")
                 .trim();
             } else if (!isJsonRequested) {
-              if (webImages.length > 0 && !enrichedText.includes(webImages[0].url)) {
+              const firstImg = webImages[0];
+              if (firstImg && !enrichedText.includes(firstImg.url)) {
                 enrichedText += "\n\n### 🖼️ Images from Google & Web:\n\n";
                 for (const img of webImages) {
                   enrichedText += `![${img.title}](${img.url})\n*${img.title}* · [View Full Image](${img.url})\n\n`;
                 }
               }
-              if (webVideos.length > 0 && !enrichedText.includes(webVideos[0].videoId)) {
+              const firstVid = webVideos[0];
+              if (firstVid && !enrichedText.includes(firstVid.videoId)) {
                 enrichedText += "\n\n### 🎬 Videos & Clips:\n\n";
                 for (const vid of webVideos) {
                   enrichedText += `- [${vid.title}](${vid.url})\n`;
@@ -804,7 +816,7 @@ CRITICAL MANDATES:
           const systemPrompt = [
             modelPersona,
             body.system || "",
-            "Creator & Developer Attribution: You are Creative AI, built and created by Bhavyash Redd. If asked who built, created, made, or developed you, state that you were created and built by Bhavyash Redd.",
+            "Creator & Developer & Model Attribution: You are My AI Pro, powered by the My AI Pro 1.1 model architecture, built and created by Bhavyash Redd. If asked which model you are using, what model you are, or what version you are running, state that you are using My AI Pro 1.1. If asked who built, created, made, or developed you, state that you were created and built by Bhavyash Redd.",
             multiEngineContext
               ? `\n\n[REAL-TIME SEARCH & KNOWLEDGE GROUNDING]:\n${multiEngineContext}`
               : "",
@@ -857,7 +869,7 @@ CRITICAL MANDATES:
           }
 
           // Priority A: Direct DeepSeek API (if DEEPSEEK_API_KEY is configured)
-          const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
+          const deepseekApiKey = process.env["DEEPSEEK_API_KEY"];
           if (deepseekApiKey) {
             try {
               const formattedMsgs = [
@@ -940,17 +952,16 @@ CRITICAL MANDATES:
 
                 if (parts.length === 0) continue;
 
-                if (
-                  geminiContents.length > 0 &&
-                  geminiContents[geminiContents.length - 1].role === role
-                ) {
-                  geminiContents[geminiContents.length - 1].parts.push(...parts);
+                const lastContent = geminiContents[geminiContents.length - 1];
+                if (lastContent && lastContent.role === role) {
+                  lastContent.parts.push(...parts);
                 } else {
                   geminiContents.push({ role, parts });
                 }
               }
 
-              if (geminiContents.length === 0 || geminiContents[0].role !== "user") {
+              const firstContent = geminiContents[0];
+              if (!firstContent || firstContent.role !== "user") {
                 geminiContents.unshift({
                   role: "user",
                   parts: [{ text: userQueryText || "Hello" }],

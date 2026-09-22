@@ -1,4 +1,13 @@
-import { Sparkles, MessageSquare, Presentation, Bot, Mic, Code2, BrainCircuit } from "lucide-react";
+import {
+  Sparkles,
+  MessageSquare,
+  Presentation,
+  Bot,
+  Mic,
+  Code2,
+  Database,
+  BrainCircuit,
+} from "lucide-react";
 
 export type Feature = {
   to: string;
@@ -32,4 +41,17 @@ export const FEATURES: Feature[] = [
     desc: "Decks generated in 10-20 seconds with Canva tools",
     icon: Presentation,
   },
+  {
+    to: "/app/database",
+    label: "AWS & Databases",
+    desc: "Production AWS RDS, PostgreSQL, MySQL & DynamoDB cloud connections",
+    icon: Database,
+  },
+  {
+    to: "/app/coding",
+    label: "AI Coding Studio",
+    desc: "Deep code generation, live sandbox, games & autonomous debugging",
+    icon: Code2,
+  },
 ];
+

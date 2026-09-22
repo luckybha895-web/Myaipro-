@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 import {
   getAgentMemories,
   saveAgentMemory,
@@ -38,7 +39,7 @@ import {
 
 interface Props {
   currentAction: AgentDeviceAction | null;
-  onClearAction?: () => void;
+  onClearAction?: (() => void) | undefined;
 }
 
 export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
@@ -312,11 +313,11 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                       {/* Chat recipient header */}
                       <div className="flex items-center gap-2 border-b border-border/40 pb-2">
                         <div className="size-7 rounded-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
-                          {currentAction.data?.recipient?.charAt(0) || "F"}
+                          {String(currentAction.data?.["recipient"] || "F").charAt(0)}
                         </div>
                         <div>
                           <p className="text-xs font-bold text-foreground">
-                            {currentAction.data?.recipient || "Friend"}
+                            {String(currentAction.data?.["recipient"] || "Friend")}
                           </p>
                           <p className="text-[9px] text-emerald-500">Online · Mobile</p>
                         </div>
@@ -328,8 +329,10 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                           Hey! How are you doing?
                         </div>
                         <div className="ml-auto rounded-2xl rounded-br-none bg-primary p-2.5 text-[11px] max-w-[85%] text-primary-foreground shadow-sm">
-                          {currentAction.data?.message ||
-                            "Hey! Let's catch up and discuss the project."}
+                          {String(
+                            currentAction.data?.["message"] ||
+                              "Hey! Let's catch up and discuss the project.",
+                          )}
                           <div className="text-[9px] text-primary-foreground/70 text-right mt-1 flex items-center justify-end gap-1">
                             <span>9:41 AM</span>
                             <CheckCircle2 className="size-3 text-white" />
@@ -353,10 +356,12 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                       <div className="rounded-lg bg-muted/40 p-2 text-xs flex items-center justify-between border border-border/50">
                         <div>
                           <p className="font-bold text-foreground">
-                            {currentAction.data?.from || "NYC"} ✈️ {currentAction.data?.to || "LON"}
+                            {String(currentAction.data?.["from"] || "NYC")} ✈️{" "}
+                            {String(currentAction.data?.["to"] || "LON")}
                           </p>
                           <p className="text-[10px] text-muted-foreground">
-                            Date: {currentAction.data?.date || "Next Week"} · 1 Passenger
+                            Date: {String(currentAction.data?.["date"] || "Next Week")} · 1
+                            Passenger
                           </p>
                         </div>
                         <span className="text-[10px] font-semibold text-primary">Best Deal</span>
@@ -368,7 +373,7 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                           <div>
                             <p className="font-bold text-foreground">Nonstop · 7h 15m</p>
                             <p className="text-[10px] text-muted-foreground">
-                              {currentAction.data?.airline || "Delta / Virgin Atlantic"}
+                              {String(currentAction.data?.["airline"] || "Delta / Virgin Atlantic")}
                             </p>
                             <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5">
                               ✓ Aisle Seat Selected from Memory
@@ -376,7 +381,7 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-bold text-foreground">
-                              ${currentAction.data?.price || "480"}
+                              ${String(currentAction.data?.["price"] || "480")}
                             </p>
                             <span className="text-[9px] text-muted-foreground">Round trip</span>
                           </div>
@@ -403,7 +408,7 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                         <Globe className="size-3 text-amber-500" />
                         <span className="truncate">
                           https://store.amazon.com/search?q=
-                          {encodeURIComponent(String(currentAction.data?.item || "item"))}
+                          {encodeURIComponent(String(currentAction.data?.["item"] || "item"))}
                         </span>
                       </div>
 
@@ -415,17 +420,17 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                           </div>
                           <div className="min-w-0 flex-1">
                             <span className="inline-block px-1.5 py-0.2 rounded text-[9px] font-semibold bg-amber-500/15 text-amber-600 mb-0.5">
-                              {String(currentAction.data?.store || "Online Store")} · Best Rated
+                              {String(currentAction.data?.["store"] || "Online Store")} · Best Rated
                             </span>
                             <p className="text-xs font-bold text-foreground truncate">
                               {String(
-                                currentAction.data?.itemName ||
-                                  currentAction.data?.item ||
+                                currentAction.data?.["itemName"] ||
+                                  currentAction.data?.["item"] ||
                                   "Product",
                               )}
                             </p>
                             <p className="text-[11px] font-semibold text-emerald-600 mt-0.5">
-                              ${String(currentAction.data?.price || "39.99")} · In Stock
+                              ${String(currentAction.data?.["price"] || "39.99")} · In Stock
                             </p>
                           </div>
                         </div>
@@ -436,7 +441,7 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                             <span>Delivery to:</span>
                             <span className="font-semibold text-foreground">
                               {String(
-                                currentAction.data?.deliveryAddress ||
+                                currentAction.data?.["deliveryAddress"] ||
                                   "742 Evergreen Terrace (Saved)",
                               )}
                             </span>
@@ -444,7 +449,7 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                           <p className="flex justify-between">
                             <span>Est. Arrival:</span>
                             <span className="font-semibold text-emerald-600">
-                              {String(currentAction.data?.eta || "Tomorrow by 2:00 PM")}
+                              {String(currentAction.data?.["eta"] || "Tomorrow by 2:00 PM")}
                             </span>
                           </p>
                         </div>
@@ -467,8 +472,8 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                           }}
                           className="w-full mt-2 bg-amber-600 hover:bg-amber-500 text-white font-bold h-7 text-xs rounded-lg cursor-pointer"
                         >
-                          Confirm &amp; Place Order (${String(currentAction.data?.price || "39.99")}
-                          )
+                          Confirm &amp; Place Order ($
+                          {String(currentAction.data?.["price"] || "39.99")})
                         </Button>
                       </div>
                     </div>
@@ -491,7 +496,7 @@ export function AgentDeviceScreen({ currentAction, onClearAction }: Props) {
                       <div className="relative aspect-video w-full rounded-xl overflow-hidden bg-gradient-to-tr from-slate-900 via-purple-950 to-slate-900 border border-purple-500/30 flex items-center justify-center p-2">
                         <img
                           src={String(
-                            currentAction.data?.photoUrl ||
+                            currentAction.data?.["photoUrl"] ||
                               "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=600&q=80",
                           )}
                           alt="Photo Studio preview"

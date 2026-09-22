@@ -1,3 +1,5 @@
+import { consumeTokens, getSubscription } from "./subscription";
+
 export type AiMessage = {
   role: "system" | "user" | "assistant";
   content: unknown;
@@ -11,7 +13,7 @@ export type GroundedSource = {
 export type AiMediaImage = {
   title: string;
   url: string;
-  source?: string;
+  source?: string | undefined;
 };
 
 export type AiMediaVideo = {
@@ -24,10 +26,10 @@ export type AiMediaVideo = {
 export type AiResult = {
   text: string;
   imageUrl: string | null;
-  images?: AiMediaImage[];
-  videos?: AiMediaVideo[];
-  sources?: GroundedSource[];
-  grounded?: boolean;
+  images?: AiMediaImage[] | undefined;
+  videos?: AiMediaVideo[] | undefined;
+  sources?: GroundedSource[] | undefined;
+  grounded?: boolean | undefined;
 };
 
 export class AiServiceError extends Error {
@@ -40,13 +42,23 @@ export class AiServiceError extends Error {
 export async function askAI(
   messages: AiMessage[],
   opts: {
-    system?: string;
-    model?: string;
-    mode?: "chat" | "research" | "coding" | "presentations" | "build" | "voice" | "agent";
-    image?: boolean;
-    search?: boolean;
+    system?: string | undefined;
+    model?: string | undefined;
+    mode?:
+      ("chat" | "research" | "coding" | "presentations" | "build" | "voice" | "agent") | undefined;
+    image?: boolean | undefined;
+    search?: boolean | undefined;
+    apiKey?: string | undefined;
   } = {},
 ): Promise<AiResult> {
+  // Check subscription token allowance
+  const currentSub = getSubscription();
+  if (currentSub.tokensUsed >= currentSub.tokensLimit) {
+    throw new AiServiceError(
+      "You have reached your subscription token limit. Please upgrade your plan in Indian Rupees (₹199, ₹299, or ₹599) to continue.",
+    );
+  }
+
   const res = await fetch("/api/ai", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -61,6 +73,13 @@ export async function askAI(
     throw new AiServiceError(data.error ?? "The AI request failed.");
   }
 
+  // Deduct tokens based on prompt and response volume
+  const approximateTokens = Math.max(
+    35,
+    Math.round(((JSON.stringify(messages).length + (data.text?.length || 0)) / 4) * 0.8),
+  );
+  consumeTokens(approximateTokens);
+
   return {
     text: data.text ?? "",
     imageUrl: data.imageUrl ?? null,
@@ -74,7 +93,7 @@ export async function askAI(
 function cleanAndExtractJson(text: string): string {
   // First check if surrounded by markdown code block
   const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  const target = codeBlockMatch ? codeBlockMatch[1].trim() : text.trim();
+  const target = codeBlockMatch && codeBlockMatch[1] ? codeBlockMatch[1].trim() : text.trim();
 
   const start = target.search(/[[{]/);
   const lastBrace = target.lastIndexOf("}");
@@ -91,11 +110,12 @@ function cleanAndExtractJson(text: string): string {
 export async function askAIJson<T>(
   messages: AiMessage[],
   opts: {
-    system?: string;
-    model?: string;
-    mode?: "chat" | "research" | "coding" | "presentations" | "build" | "voice" | "agent";
-    search?: boolean;
-    apiKey?: string;
+    system?: string | undefined;
+    model?: string | undefined;
+    mode?:
+      ("chat" | "research" | "coding" | "presentations" | "build" | "voice" | "agent") | undefined;
+    search?: boolean | undefined;
+    apiKey?: string | undefined;
   } = {},
 ): Promise<T> {
   const { text } = await askAI(messages, {

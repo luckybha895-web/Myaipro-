@@ -1,6 +1,7 @@
 import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { AppHeader } from "@/components/AppHeader";
 import { AppSidebar } from "@/components/AppSidebar";
+import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -25,13 +26,15 @@ export const Route = createFileRoute("/app")({
 function AppLayout() {
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="flex min-h-screen w-full bg-background text-foreground">
+      <div className="flex min-h-screen w-full bg-background text-foreground pb-16 md:pb-0">
         <AppSidebar />
         <SidebarInset className="flex min-w-0 flex-1 flex-col overflow-x-hidden">
           <AppHeader />
           <Outlet />
+          <MobileBottomNav />
         </SidebarInset>
       </div>
     </SidebarProvider>
   );
 }
+

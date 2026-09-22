@@ -11,12 +11,12 @@ import { supabase } from "@/integrations/supabase/client";
 export const Route = createFileRoute("/app/")({
   head: () => ({
     meta: [
-      { title: "Studio — Creative AI" },
+      { title: "Studio — My AI Pro" },
       {
         name: "description",
-        content: "Describe your idea and Creative AI builds the app for you.",
+        content: "Describe your idea and My AI Pro builds the app for you.",
       },
-      { property: "og:title", content: "Creative AI Studio" },
+      { property: "og:title", content: "My AI Pro Studio" },
       { property: "og:description", content: "Describe your idea and watch it get built." },
     ],
   }),
@@ -52,7 +52,7 @@ function Home() {
     <main className="mx-auto w-full max-w-3xl flex-1 px-4 pb-16">
       <section className="hero-glow rounded-3xl px-4 pt-12 pb-8 text-center">
         <h1 className="font-display text-4xl font-bold tracking-tight">
-          Creative <span className="brand-text">AI</span>
+          My AI <span className="brand-text">Pro</span>
         </h1>
         <p className="mt-3 text-lg text-muted-foreground">
           Let&apos;s build something, <span className="text-foreground">{username}</span>.
@@ -146,7 +146,7 @@ function Home() {
             autoFocus
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search Creative AI…"
+            placeholder="Search My AI Pro…"
           />
         </div>
       )}

@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useRef, useEffect } from "react";
+import { notifyUnifiedHistoryUpdated } from "@/lib/unified-history";
 import {
   Presentation,
   Loader2,
@@ -31,6 +32,11 @@ import {
   Palette,
   Clock,
   Edit3,
+  PenTool,
+  Eraser,
+  GripVertical,
+  MousePointerClick,
+  Paintbrush,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +56,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 import { askAI, askAIJson, fileBlock } from "@/lib/ai";
 import { handlePresentationJsonSynthesis } from "@/lib/neural-engine";
 import { useAi } from "@/components/AiProvider";
@@ -252,6 +265,16 @@ const SAMPLE_CYBER_SLIDES: Slide[] = [
   },
 ];
 
+export interface PresentationAsset {
+  id: string;
+  url: string;
+  name: string;
+  type: "upload" | "drawn" | "ai";
+  createdAt: number;
+}
+
+const PRESENTATION_ASSETS_KEY = "my_ai_pro_presentation_assets";
+
 function Presentations() {
   const search = Route.useSearch();
   const [topic, setTopic] = useState<string>(() => search.topic || "");
@@ -277,6 +300,38 @@ function Presentations() {
   >("none");
   const [canvaPrompt, setCanvaPrompt] = useState("");
   const [showAccentLines, setShowAccentLines] = useState(true);
+
+  // Drag and drop image state
+  const [isDragOverSlide, setIsDragOverSlide] = useState(false);
+
+  // Drawing canvas modal state
+  const [drawModalOpen, setDrawModalOpen] = useState(false);
+
+  // Assets gallery for uploads, drawn sketches, and AI images
+  const [presentationAssets, setPresentationAssets] = useState<PresentationAsset[]>(() => {
+    try {
+      const raw = localStorage.getItem(PRESENTATION_ASSETS_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch {
+      /* ignore */
+    }
+    return [
+      {
+        id: "asset_sample_1",
+        url: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=800&q=80",
+        name: "Cyber Security Grid",
+        type: "ai",
+        createdAt: Date.now() - 60000,
+      },
+      {
+        id: "asset_sample_2",
+        url: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=800&q=80",
+        name: "Global Infrastructure",
+        type: "ai",
+        createdAt: Date.now() - 120000,
+      },
+    ];
+  });
 
   // Undo/Redo history stack
   const [historyStack, setHistoryStack] = useState<Slide[][]>([]);
@@ -330,9 +385,9 @@ function Presentations() {
 
   function normalizeSlides(slidesArray: unknown): Slide[] {
     if (!Array.isArray(slidesArray) || slidesArray.length === 0) {
-      return DEMO_SLIDES.map((s, i) => normalizeSlide(s, i));
+      return SAMPLE_CYBER_SLIDES.map((s, i) => normalizeSlide(s, i));
     }
-    return slidesArray.map((s, i) => normalizeSlide(s, i));
+    return slidesArray.map((s, i) => normalizeSlide(s as Partial<Slide>, i));
   }
 
   // Save or update deck in local storage
@@ -355,6 +410,7 @@ function Presentations() {
       const updated = [newRecord, ...filtered];
       try {
         localStorage.setItem(SAVED_PRESENTATIONS_KEY, JSON.stringify(updated));
+        notifyUnifiedHistoryUpdated();
       } catch {
         /* ignore */
       }
@@ -388,7 +444,7 @@ function Presentations() {
       toast.success(`Resumed "${saved.title || "Presentation"}" in Canva Editor!`);
     } catch (err) {
       console.error("Resume presentation failed:", err);
-      setSlides(DEMO_SLIDES.map((s, i) => normalizeSlide(s, i)));
+      setSlides(SAMPLE_CYBER_SLIDES.map((s, i) => normalizeSlide(s, i)));
       setViewMode("editor");
       toast.success("Loaded presentation deck in Canva Editor");
     }
@@ -407,6 +463,7 @@ function Presentations() {
       const updated = [copy, ...prev];
       try {
         localStorage.setItem(SAVED_PRESENTATIONS_KEY, JSON.stringify(updated));
+        notifyUnifiedHistoryUpdated();
       } catch {
         /* ignore */
       }
@@ -421,6 +478,7 @@ function Presentations() {
       const updated = prev.filter((p) => p.id !== id);
       try {
         localStorage.setItem(SAVED_PRESENTATIONS_KEY, JSON.stringify(updated));
+        notifyUnifiedHistoryUpdated();
       } catch {
         /* ignore */
       }
@@ -441,10 +499,12 @@ function Presentations() {
       return;
     }
     const previous = historyStack[historyStack.length - 1];
-    setFutureStack((prev) => [JSON.parse(JSON.stringify(slides)), ...prev]);
-    setHistoryStack((prev) => prev.slice(0, -1));
-    setSlides(previous);
-    toast.success("Undone");
+    if (previous) {
+      setFutureStack((prev) => [JSON.parse(JSON.stringify(slides)), ...prev]);
+      setHistoryStack((prev) => prev.slice(0, -1));
+      setSlides(previous);
+      toast.success("Undone");
+    }
   }
 
   function handleRedo() {
@@ -453,10 +513,12 @@ function Presentations() {
       return;
     }
     const next = futureStack[0];
-    setHistoryStack((prev) => [...prev, JSON.parse(JSON.stringify(slides))]);
-    setFutureStack((prev) => prev.slice(1));
-    setSlides(next);
-    toast.success("Redone");
+    if (next) {
+      setHistoryStack((prev) => [...prev, JSON.parse(JSON.stringify(slides))]);
+      setFutureStack((prev) => prev.slice(1));
+      setSlides(next);
+      toast.success("Redone");
+    }
   }
 
   async function make() {
@@ -571,14 +633,56 @@ First slide is a high-impact title slide (1-2 subtitle bullets), last slide is a
     toast.success("Loaded Cybersecurity deck into Canva Studio!");
   }
 
+  // Add asset to gallery (persisted)
+  function addPresentationAsset(url: string, name: string, type: "upload" | "drawn" | "ai") {
+    const newAsset: PresentationAsset = {
+      id: `asset_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      url,
+      name,
+      type,
+      createdAt: Date.now(),
+    };
+    setPresentationAssets((prev) => {
+      const updated = [newAsset, ...prev.filter((a) => a.url !== url)];
+      try {
+        localStorage.setItem(PRESENTATION_ASSETS_KEY, JSON.stringify(updated.slice(0, 40)));
+      } catch {
+        /* ignore */
+      }
+      return updated;
+    });
+    return newAsset;
+  }
+
+  function removePresentationAsset(id: string) {
+    setPresentationAssets((prev) => {
+      const updated = prev.filter((a) => a.id !== id);
+      try {
+        localStorage.setItem(PRESENTATION_ASSETS_KEY, JSON.stringify(updated));
+      } catch {
+        /* ignore */
+      }
+      return updated;
+    });
+    toast.info("Image removed from uploads gallery");
+  }
+
   async function generateConceptImage(i: number) {
     const slide = slides[i];
     if (!slide) return;
     recordHistory();
     setImaging(i);
     try {
-      const prompt =
-        slide.image_prompt || `${slide.title} ${topic} professional modern presentation visual`;
+      const presentationTopic = topic.trim() || activeSlide?.title || "Strategic Presentation";
+      const slideTitle = slide.title || "Strategic Takeaway";
+      const slideDetails =
+        Array.isArray(slide.bullets) && slide.bullets.length > 0
+          ? slide.bullets.slice(0, 3).join("; ")
+          : slideTitle;
+
+      const aiPrompt = `Clean, modern 16:9 presentation slide visual for topic "${presentationTopic}". Specific slide subject: "${slideTitle}". Context & details: ${slide.image_prompt || slideDetails}. Photorealistic, clean cinematic presentation graphic, 8k resolution, authentic lighting, no distorted text.`;
+
+      toast.info(`Generating visual for "${slideTitle}" based on topic "${presentationTopic}"...`);
       let finalImgUrl: string | null = null;
 
       try {
@@ -586,7 +690,7 @@ First slide is a high-impact title slide (1-2 subtitle bullets), last slide is a
           [
             {
               role: "user",
-              content: `Create a clean, photorealistic presentation visual representing: "${prompt}". Concept: ${slide.title}. High aesthetic, clean 16:9 composition.`,
+              content: `Generate a photorealistic 16:9 presentation slide graphic for the presentation topic: "${presentationTopic}". Slide title: "${slideTitle}". Strategic points: ${slideDetails}. Highly relevant, elegant, modern composition.`,
             },
           ],
           {
@@ -598,38 +702,66 @@ First slide is a high-impact title slide (1-2 subtitle bullets), last slide is a
         }
       } catch (genErr) {
         console.warn(
-          "AI Image generation returned an error, activating immediate fallback:",
+          "AI Image generation returned an error, activating thematic fallback:",
           genErr,
         );
       }
 
       if (!finalImgUrl) {
-        // Thematic curated photo fallbacks based on slide topic
-        const lowerTopic = (slide.title + " " + topic).toLowerCase();
-        if (lowerTopic.includes("cyber") || lowerTopic.includes("security")) {
+        // High quality curated thematic images strictly relevant to presentation and slide topic
+        const combined = `${presentationTopic} ${slideTitle} ${slideDetails}`.toLowerCase();
+        if (
+          combined.includes("cyber") ||
+          combined.includes("security") ||
+          combined.includes("shield") ||
+          combined.includes("threat") ||
+          combined.includes("hack")
+        ) {
           finalImgUrl =
             "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?auto=format&fit=crop&w=1200&q=80";
         } else if (
-          lowerTopic.includes("finance") ||
-          lowerTopic.includes("invest") ||
-          lowerTopic.includes("money")
+          combined.includes("cloud") ||
+          combined.includes("data") ||
+          combined.includes("infra") ||
+          combined.includes("server") ||
+          combined.includes("network")
+        ) {
+          finalImgUrl =
+            "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80";
+        } else if (
+          combined.includes("finance") ||
+          combined.includes("invest") ||
+          combined.includes("money") ||
+          combined.includes("market") ||
+          combined.includes("stock")
         ) {
           finalImgUrl =
             "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80";
         } else if (
-          lowerTopic.includes("health") ||
-          lowerTopic.includes("med") ||
-          lowerTopic.includes("bio")
+          combined.includes("health") ||
+          combined.includes("med") ||
+          combined.includes("bio") ||
+          combined.includes("doctor")
         ) {
           finalImgUrl =
             "https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=1200&q=80";
         } else if (
-          lowerTopic.includes("cloud") ||
-          lowerTopic.includes("data") ||
-          lowerTopic.includes("server")
+          combined.includes("ai") ||
+          combined.includes("robot") ||
+          combined.includes("tech") ||
+          combined.includes("neural") ||
+          combined.includes("machine")
         ) {
           finalImgUrl =
-            "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80";
+            "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80";
+        } else if (
+          combined.includes("green") ||
+          combined.includes("solar") ||
+          combined.includes("energy") ||
+          combined.includes("eco")
+        ) {
+          finalImgUrl =
+            "https://images.unsplash.com/photo-1497435334941-8c899ee9e8e9?auto=format&fit=crop&w=1200&q=80";
         } else {
           finalImgUrl =
             "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80";
@@ -637,7 +769,9 @@ First slide is a high-impact title slide (1-2 subtitle bullets), last slide is a
       }
 
       setSlides((all) => all.map((s, idx) => (idx === i ? { ...s, imageUrl: finalImgUrl } : s)));
-      toast.success("Concept image matched and attached to slide!");
+      // Register into Uploads gallery so user can reuse or drag to other slides
+      addPresentationAsset(finalImgUrl, `${slideTitle.slice(0, 22)} (AI)`, "ai");
+      toast.success(`AI image matched to "${slideTitle}" and added to slide & uploads!`);
     } catch (e) {
       handleAiError(e);
       toast.error(e instanceof Error ? e.message : "Concept image generation failed.");
@@ -655,7 +789,8 @@ First slide is a high-impact title slide (1-2 subtitle bullets), last slide is a
       recordHistory();
       setGlobalLogo(url);
       setSlides((all) => all.map((s) => ({ ...s, logoUrl: url })));
-      toast.success("Logo uploaded and added to all slides!");
+      addPresentationAsset(url, file.name || "Brand Logo", "upload");
+      toast.success("Logo uploaded, applied to all slides, and added to gallery!");
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -669,7 +804,8 @@ First slide is a high-impact title slide (1-2 subtitle bullets), last slide is a
       const url = reader.result as string;
       recordHistory();
       edit(activeSlideIdx, { imageUrl: url });
-      toast.success("Image added to slide!");
+      addPresentationAsset(url, file.name || "Uploaded Graphic", "upload");
+      toast.success("Image uploaded! Attached to slide and saved to Uploads gallery.");
     };
     reader.readAsDataURL(file);
     e.target.value = "";
@@ -809,7 +945,7 @@ Rewrite the title and bullet points to satisfy the request. Return only the upda
       );
 
       const lines = (res.text || "").split("\n").filter((l) => l.trim().length > 0);
-      if (lines.length > 0) {
+      if (lines.length > 0 && lines[0]) {
         const newTitle = lines[0]
           .replace(/^#+\s*/, "")
           .replace(/^Title:\s*/i, "")
@@ -1300,8 +1436,60 @@ Rewrite the title and bullet points to satisfy the request. Return only the upda
       {/* Upper Area: Live 16:9 Slide Canvas with Click-to-Edit Text */}
       <div className="flex-1 flex items-center justify-center p-3 sm:p-6 bg-[#001b20]">
         <div
-          className={`relative w-full max-w-4xl aspect-[16/10] sm:aspect-video rounded-2xl sm:rounded-3xl border border-cyan-800/40 shadow-2xl p-6 sm:p-10 flex flex-col justify-between overflow-hidden ${currentTheme.bg}`}
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragOverSlide(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragOverSlide(false);
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragOverSlide(false);
+            const draggedUrl =
+              e.dataTransfer.getData("application/my-ai-pro-image") ||
+              e.dataTransfer.getData("text/plain");
+            if (draggedUrl) {
+              recordHistory();
+              edit(activeSlideIdx, { imageUrl: draggedUrl });
+              toast.success("Image dropped and added to presentation slide!");
+            } else if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+              const file = e.dataTransfer.files[0];
+              const reader = new FileReader();
+              reader.onload = () => {
+                if (typeof reader.result === "string") {
+                  const url = reader.result;
+                  recordHistory();
+                  edit(activeSlideIdx, { imageUrl: url });
+                  addPresentationAsset(url, file.name || "Dropped Graphic", "upload");
+                  toast.success("Image dropped, added to slide, and saved to Uploads!");
+                }
+              };
+              reader.readAsDataURL(file);
+            }
+          }}
+          className={`relative w-full max-w-4xl aspect-[16/10] sm:aspect-video rounded-2xl sm:rounded-3xl border ${
+            isDragOverSlide
+              ? "border-cyan-400 ring-4 ring-cyan-400/50 scale-[1.01]"
+              : "border-cyan-800/40"
+          } shadow-2xl p-6 sm:p-10 flex flex-col justify-between overflow-hidden transition-all ${currentTheme.bg}`}
         >
+          {/* Visual Drop Highlight Indicator */}
+          {isDragOverSlide && (
+            <div className="absolute inset-0 z-50 bg-[#001b20]/90 backdrop-blur-xs flex flex-col items-center justify-center text-cyan-300 border-2 border-dashed border-cyan-400 rounded-2xl sm:rounded-3xl animate-in fade-in duration-150">
+              <Upload className="size-12 mb-3 text-cyan-400 animate-bounce" />
+              <p className="text-base font-bold uppercase tracking-wider text-white">
+                Drop Image to Attach to Slide
+              </p>
+              <p className="text-xs text-cyan-300/80 mt-1">
+                Release image to insert into slide {activeSlideIdx + 1}
+              </p>
+            </div>
+          )}
           {/* Subtle Cyber Accent Speed Lines (Top Right & Bottom Left matching Screenshot 1) */}
           {showAccentLines && (
             <>
@@ -1703,22 +1891,138 @@ Rewrite the title and bullet points to satisfy the request. Return only the upda
 
             {/* Uploads Drawer Content */}
             {activeTab === "uploads" && (
-              <div className="flex items-center gap-3">
-                <Button
-                  size="sm"
-                  onClick={() => slideImageInputRef.current?.click()}
-                  className="gap-1.5 text-xs bg-[#004752] text-white"
-                >
-                  <Upload className="size-3.5" /> Upload Image to Slide
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => generateConceptImage(activeSlideIdx)}
-                  className="gap-1.5 text-xs border-cyan-800 bg-[#001a1f] text-cyan-300"
-                >
-                  <Sparkles className="size-3.5" /> AI Generate Image
-                </Button>
+              <div className="space-y-3.5">
+                {/* Action Bar: Upload, Draw, AI Generate */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => slideImageInputRef.current?.click()}
+                    className="gap-1.5 text-xs bg-[#004752] hover:bg-[#005764] text-white"
+                  >
+                    <Upload className="size-3.5" /> Upload Image
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    onClick={() => setDrawModalOpen(true)}
+                    className="gap-1.5 text-xs bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold shadow-sm"
+                  >
+                    <PenTool className="size-3.5" /> Draw Image
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => generateConceptImage(activeSlideIdx)}
+                    className="gap-1.5 text-xs border-cyan-700/60 bg-[#001a1f] hover:bg-cyan-950 text-cyan-300 font-semibold"
+                  >
+                    <Sparkles className="size-3.5" /> AI Generate Image
+                  </Button>
+                </div>
+
+                {/* Drag-and-Drop Guidance Banner */}
+                <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-[#001a1f] border border-cyan-900/50 text-[11px] text-cyan-200">
+                  <span className="flex items-center gap-1.5">
+                    <GripVertical className="size-3.5 text-cyan-400 shrink-0" />
+                    <span>
+                      Drag any image directly onto the presentation slide above, or click{" "}
+                      <strong className="text-white">Insert</strong>.
+                    </span>
+                  </span>
+                  <span className="text-slate-400 font-mono text-[10px]">
+                    {presentationAssets.length} assets
+                  </span>
+                </div>
+
+                {/* Uploaded & Drawn Images Gallery */}
+                {presentationAssets.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-cyan-800/40 p-4 text-center text-xs text-slate-400">
+                    No images in your presentation library yet. Upload an image, draw a sketch, or
+                    generate one with AI!
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                    {presentationAssets.map((asset) => (
+                      <div
+                        key={asset.id}
+                        draggable={true}
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/plain", asset.url);
+                          e.dataTransfer.setData("application/my-ai-pro-image", asset.url);
+                          e.dataTransfer.effectAllowed = "copy";
+                        }}
+                        className="group relative rounded-xl border border-cyan-800/40 hover:border-cyan-400/80 bg-[#00171c] hover:bg-[#00222a] p-1.5 transition-all shadow-md cursor-grab active:cursor-grabbing"
+                      >
+                        {/* Image Thumbnail */}
+                        <div className="relative aspect-video w-full rounded-lg overflow-hidden bg-black/40">
+                          <img
+                            src={asset.url}
+                            alt={asset.name}
+                            className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                          />
+                          {/* Badge tag: Uploaded, Drawn, or AI */}
+                          <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold shadow-md flex items-center gap-1 bg-black/80 backdrop-blur-xs text-white border border-white/20">
+                            {asset.type === "drawn" && (
+                              <>
+                                <PenTool className="size-2.5 text-amber-400" />
+                                <span className="text-amber-300">Drawn</span>
+                              </>
+                            )}
+                            {asset.type === "upload" && (
+                              <>
+                                <Upload className="size-2.5 text-cyan-400" />
+                                <span className="text-cyan-300">Uploaded</span>
+                              </>
+                            )}
+                            {asset.type === "ai" && (
+                              <>
+                                <Sparkles className="size-2.5 text-teal-400" />
+                                <span className="text-teal-300">AI</span>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Hover drag pill */}
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+                            <span className="text-[10px] font-bold text-white bg-black/70 px-2 py-0.5 rounded-full border border-white/20 flex items-center gap-1">
+                              <GripVertical className="size-3 text-cyan-300" /> Drag to Slide
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Card Footer: Name and Quick Insert / Delete */}
+                        <div className="mt-1.5 flex items-center justify-between gap-1 text-[10px]">
+                          <span className="truncate text-slate-200 font-medium flex-1">
+                            {asset.name}
+                          </span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                recordHistory();
+                                edit(activeSlideIdx, { imageUrl: asset.url });
+                                toast.success(`Inserted into slide ${activeSlideIdx + 1}!`);
+                              }}
+                              className="px-1.5 py-0.5 rounded bg-cyan-950 hover:bg-cyan-800 border border-cyan-800/60 text-cyan-300 font-semibold transition-colors flex items-center gap-0.5"
+                              title="Insert into current slide"
+                            >
+                              <MousePointerClick className="size-2.5" />
+                              <span>Insert</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removePresentationAsset(asset.id)}
+                              className="p-1 rounded text-slate-400 hover:text-red-400 hover:bg-red-950/40 transition-colors"
+                              title="Delete from uploads"
+                            >
+                              <Trash2 className="size-2.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1848,7 +2152,266 @@ Rewrite the title and bullet points to satisfy the request. Return only the upda
           </div>
         </div>
       )}
+
+      {/* Draw / Sketch Image Modal */}
+      <DrawImageModal
+        open={drawModalOpen}
+        onClose={() => setDrawModalOpen(false)}
+        onSave={(dataUrl, name, insertToSlide) => {
+          recordHistory();
+          addPresentationAsset(dataUrl, name || "Drawn Sketch", "drawn");
+          if (insertToSlide) {
+            edit(activeSlideIdx, { imageUrl: dataUrl });
+            toast.success("Drawn image saved to Uploads and added to slide!");
+          } else {
+            toast.success("Drawn image saved to Uploads! Drag it onto any slide.");
+          }
+        }}
+      />
     </div>
+  );
+}
+
+interface DrawImageModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSave: (dataUrl: string, name: string, insertToSlide: boolean) => void;
+}
+
+function DrawImageModal({ open, onClose, onSave }: DrawImageModalProps) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [color, setColor] = useState("#22d3ee");
+  const [lineWidth, setLineWidth] = useState(4);
+  const [isEraser, setIsEraser] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawnName, setDrawnName] = useState("Hand-Drawn Sketch");
+
+  useEffect(() => {
+    if (open && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.fillStyle = "#031317";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  function getCanvasCoords(
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+  ) {
+    const canvas = canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    let clientX = 0;
+    let clientY = 0;
+    if ("touches" in e) {
+      const touch = e.touches[0];
+      if (touch) {
+        clientX = touch.clientX;
+        clientY = touch.clientY;
+      }
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  }
+
+  function startDrawing(
+    e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>,
+  ) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    setIsDrawing(true);
+    const { x, y } = getCanvasCoords(e);
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = isEraser ? "#031317" : color;
+    ctx.lineWidth = isEraser ? lineWidth * 3 : lineWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+  }
+
+  function draw(e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    const { x, y } = getCanvasCoords(e);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+
+  function stopDrawing() {
+    setIsDrawing(false);
+  }
+
+  function clearCanvas() {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.fillStyle = "#031317";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function handleExport(insertToSlide: boolean) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL("image/png");
+    onSave(dataUrl, drawnName.trim() || "Drawn Sketch", insertToSlide);
+    onClose();
+  }
+
+  const COLOR_PALETTE = [
+    { name: "Cyan", hex: "#22d3ee" },
+    { name: "White", hex: "#ffffff" },
+    { name: "Amber", hex: "#fbbf24" },
+    { name: "Emerald", hex: "#34d399" },
+    { name: "Rose", hex: "#f43f5e" },
+    { name: "Purple", hex: "#a855f7" },
+    { name: "Sky", hex: "#38bdf8" },
+  ];
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
+      <DialogContent className="sm:max-w-xl bg-[#021b20] text-white border-cyan-700/50 p-5 rounded-3xl shadow-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-base font-bold text-cyan-300">
+            <PenTool className="size-4 text-amber-400" /> Draw / Sketch Image
+          </DialogTitle>
+          <DialogDescription className="text-xs text-slate-400">
+            Sketch diagrams, charts, or annotations. Save to Uploads to drag and drop onto your
+            presentation slides.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Canvas Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-b border-cyan-900/40 pb-3">
+          {/* Colors */}
+          <div className="flex items-center gap-1.5">
+            {COLOR_PALETTE.map((c) => (
+              <button
+                key={c.hex}
+                type="button"
+                onClick={() => {
+                  setColor(c.hex);
+                  setIsEraser(false);
+                }}
+                className={`size-6 rounded-full border transition-transform ${
+                  !isEraser && color === c.hex
+                    ? "scale-110 border-white ring-2 ring-cyan-400"
+                    : "border-white/30 hover:scale-105"
+                }`}
+                style={{ backgroundColor: c.hex }}
+                title={c.name}
+              />
+            ))}
+          </div>
+
+          {/* Stroke Widths */}
+          <div className="flex items-center gap-1 bg-[#001418] p-1 rounded-xl border border-cyan-900/40">
+            {[2, 4, 8, 14].map((w) => (
+              <button
+                key={w}
+                type="button"
+                onClick={() => setLineWidth(w)}
+                className={`px-2 py-0.5 rounded-lg text-xs font-mono transition-colors ${
+                  lineWidth === w
+                    ? "bg-cyan-500 text-slate-950 font-bold"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {w}px
+              </button>
+            ))}
+          </div>
+
+          {/* Eraser & Clear */}
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setIsEraser((prev) => !prev)}
+              className={`p-1.5 rounded-xl border text-xs flex items-center gap-1 transition-colors ${
+                isEraser
+                  ? "bg-amber-500/20 border-amber-400 text-amber-300 font-bold"
+                  : "border-cyan-900/40 bg-[#001418] text-slate-400 hover:text-white"
+              }`}
+              title="Toggle Eraser"
+            >
+              <Eraser className="size-3.5" />
+              <span className="hidden sm:inline">Eraser</span>
+            </button>
+            <button
+              type="button"
+              onClick={clearCanvas}
+              className="p-1.5 rounded-xl border border-red-900/40 bg-red-950/20 hover:bg-red-950/40 text-red-300 text-xs flex items-center gap-1 transition-colors"
+              title="Clear Canvas"
+            >
+              <Trash2 className="size-3.5" />
+              <span className="hidden sm:inline">Clear</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Canvas Area */}
+        <div className="relative rounded-2xl overflow-hidden border-2 border-cyan-800/60 bg-[#031317] shadow-inner flex items-center justify-center">
+          <canvas
+            ref={canvasRef}
+            width={640}
+            height={360}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={stopDrawing}
+            className="w-full aspect-video cursor-crosshair touch-none"
+          />
+        </div>
+
+        {/* Name input & Save Actions */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2">
+          <input
+            type="text"
+            value={drawnName}
+            onChange={(e) => setDrawnName(e.target.value)}
+            placeholder="Sketch title..."
+            className="w-full sm:w-48 bg-[#001418] border border-cyan-900/50 rounded-xl px-3 py-1.5 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-cyan-500"
+          />
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleExport(false)}
+              className="flex-1 sm:flex-none text-xs border-cyan-800 text-cyan-300 bg-[#00242b] hover:bg-[#00343e]"
+            >
+              Save to Uploads
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => handleExport(true)}
+              className="flex-1 sm:flex-none text-xs bg-gradient-to-r from-cyan-400 to-teal-400 text-slate-950 font-bold hover:brightness-110"
+            >
+              Save & Insert to Slide
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

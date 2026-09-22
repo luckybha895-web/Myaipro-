@@ -25,5 +25,9 @@ export function useAuth() {
     user?.email?.split("@")[0] ??
     "creator";
 
-  return { session, user, username, loading };
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
+
+  return { session, user, username, loading, signOut };
 }

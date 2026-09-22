@@ -335,6 +335,7 @@ export function ProjectCodeExplorer({
 
       for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
+        if (!part) continue;
         const isFile = i === parts.length - 1;
 
         if (isFile) {
@@ -344,7 +345,7 @@ export function ProjectCodeExplorer({
           };
         } else {
           current[part] = current[part] || {};
-          current = current[part];
+          current = current[part] as Record<string, unknown>;
         }
       }
     });

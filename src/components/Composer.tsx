@@ -56,16 +56,16 @@ export function readFiles(files: FileList): Promise<Attachment[]> {
 type Props = {
   value: string;
   onChange: (v: string) => void;
-  onSubmit?: () => void;
-  onSend?: () => void;
-  busy?: boolean;
-  disabled?: boolean;
-  placeholder?: string;
-  attachments?: Attachment[];
-  onAttachments?: (a: Attachment[]) => void;
-  onAttachmentsChange?: (a: Attachment[]) => void;
-  extras?: ReactNode;
-  autoFocus?: boolean;
+  onSubmit?: (() => void) | undefined;
+  onSend?: (() => void) | undefined;
+  busy?: boolean | undefined;
+  disabled?: boolean | undefined;
+  placeholder?: string | undefined;
+  attachments?: Attachment[] | undefined;
+  onAttachments?: ((a: Attachment[]) => void) | undefined;
+  onAttachmentsChange?: ((a: Attachment[]) => void) | undefined;
+  extras?: ReactNode | undefined;
+  autoFocus?: boolean | undefined;
 };
 
 export function Composer({
@@ -119,8 +119,8 @@ export function Composer({
       const segments = cleaned.split("/").filter(Boolean);
 
       if (segments.length >= 2) {
-        owner = segments[0];
-        repo = segments[1];
+        owner = segments[0] || "";
+        repo = segments[1] || "";
         if (segments[2] === "tree" && segments[3]) {
           branch = segments[3];
         }

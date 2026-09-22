@@ -75,12 +75,12 @@ import { toast } from "sonner";
 type Props = {
   mode: "chat" | "research" | "coding" | "presentations" | "build" | "voice" | "agent";
   system: string;
-  intro: { icon: LucideIcon; title: string; subtitle: string; chips?: string[] };
-  placeholder?: string;
-  allowImages?: boolean;
-  composerExtras?: React.ReactNode;
-  externalDraft?: string;
-  autoSpeak?: boolean;
+  intro: { icon: LucideIcon; title: string; subtitle: string; chips?: string[] | undefined };
+  placeholder?: string | undefined;
+  allowImages?: boolean | undefined;
+  composerExtras?: React.ReactNode | undefined;
+  externalDraft?: string | undefined;
+  autoSpeak?: boolean | undefined;
 };
 
 const uid = () => Math.random().toString(36).slice(2);
@@ -214,7 +214,7 @@ function ChatCodeBlock({ language, code }: { language: string; code: string }) {
               toast.success("Exporting to AI Builder...");
               void navigate({
                 to: "/app/build",
-                search: { prompt: `Build app from code:\n${code.slice(0, 300)}` },
+                search: { idea: `Build app from code:\n${code.slice(0, 300)}` },
               });
             }}
             className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-cyan-300 transition-colors hover:bg-white/10 hover:text-white cursor-pointer"
@@ -292,8 +292,8 @@ function renderFormattedMessage(content: string) {
         </span>,
       );
     }
-    const lang = match[1] || "code";
-    const code = match[2].trimEnd();
+    const lang = (match && match[1]) || "code";
+    const code = (match && match[2] ? match[2] : "").trimEnd();
     elements.push(<ChatCodeBlock key={`code-${match.index}`} language={lang} code={code} />);
     lastIndex = match.index + match[0].length;
   }
@@ -374,7 +374,7 @@ export function ChatSurface({
   const initSession = useCallback(() => {
     const existing = getSessionsByMode(mode);
     setSavedCount(existing.length);
-    if (existing.length > 0) {
+    if (existing.length > 0 && existing[0]) {
       const latest = existing[0];
       setCurrentSession(latest);
       setMessages(latest.messages || []);
@@ -956,26 +956,22 @@ Ensure the paper contains:
         )}
 
         {messages.map((m, i) => {
+          const prevMsg = i > 0 ? messages[i - 1] : undefined;
+          const prevContent = prevMsg?.content || "";
           // Detect if user asked for PDF or spreadsheet
           const isPdfRequested =
             /\b(pdf|make in pdf|export to pdf|create pdf|download pdf|save as pdf|as a pdf)\b/i.test(
               m.content,
             ) ||
-            (i > 0 &&
-              messages[i - 1]?.role === "user" &&
-              /\b(pdf|make in pdf|export to pdf|create pdf|download pdf)\b/i.test(
-                messages[i - 1].content,
-              ));
+            (prevMsg?.role === "user" &&
+              /\b(pdf|make in pdf|export to pdf|create pdf|download pdf)\b/i.test(prevContent));
 
           const isSpreadsheetRequested =
             /\b(spreadsheet|csv|excel|make in csv|make spreadsheet|export spreadsheet|export csv)\b/i.test(
               m.content,
             ) ||
-            (i > 0 &&
-              messages[i - 1]?.role === "user" &&
-              /\b(spreadsheet|csv|excel|make in csv|make spreadsheet)\b/i.test(
-                messages[i - 1].content,
-              ));
+            (prevMsg?.role === "user" &&
+              /\b(spreadsheet|csv|excel|make in csv|make spreadsheet)\b/i.test(prevContent));
 
           return (
             <div key={m.id} className={m.role === "user" ? "flex justify-end" : ""}>
@@ -993,12 +989,13 @@ Ensure the paper contains:
                   <div className="mt-3.5 max-w-2xl">
                     <ImagePreview
                       src={m.imageUrl}
-                      title={m.content ? m.content.slice(0, 60) : "AI Generated Artwork"}
-                      subtitle={m.model ? `Engine: ${m.model}` : "Creative AI Studio Engine"}
+                      title={m.content ? m.content.slice(0, 60) : "MyAI Pro Creation"}
+                      subtitle="MyAI Pro Visual Studio"
+                      badgeText="MyAI Pro"
                       onEdit={(url, title) =>
                         setEditingImage({
                           url: url || m.imageUrl || "",
-                          prompt: title || m.content || "AI Generated Artwork",
+                          prompt: title || m.content || "MyAI Pro Artwork",
                         })
                       }
                       onShare={(url, title) =>
@@ -1008,8 +1005,8 @@ Ensure the paper contains:
                   </div>
                 )}
 
-                {/* High-Resolution Google & Web Images Gallery */}
-                {m.images && m.images.length > 0 && (
+                {/* High-Resolution Google & Web Images Gallery (Only shown when not a single generated image) */}
+                {!m.imageUrl && m.images && m.images.length > 0 && (
                   <div className="mt-3.5 space-y-2">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                       <ImageIcon className="size-3.5 text-primary" />
@@ -1047,7 +1044,7 @@ Ensure the paper contains:
                 )}
 
                 {/* YouTube Video Cards with Inline Player */}
-                {m.videos && m.videos.length > 0 && (
+                {!m.imageUrl && m.videos && m.videos.length > 0 && (
                   <div className="mt-3.5 space-y-2">
                     <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
                       <Video className="size-3.5 text-red-500" />
@@ -1105,9 +1102,26 @@ Ensure the paper contains:
                 {/* Subtly formatted consulted references */}
                 {m.sources && m.sources.length > 0 && (
                   <div className="mt-3.5 border-t border-border/40 pt-2.5">
-                    <div className="mb-1.5 flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
-                      <Globe className="size-3" />
-                      <span>References & Search Grounding:</span>
+                    <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
+                        <Globe className="size-3.5 text-primary" />
+                        <span>Sources & References ({m.sources.length}):</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const validSources = m.sources?.filter((s) => s.url) || [];
+                          validSources.forEach((s) => {
+                            window.open(s.url, "_blank", "noopener,noreferrer");
+                          });
+                          toast.success(`Opening ${validSources.length} source links in new tabs`);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-all cursor-pointer shadow-xs active:scale-95"
+                        title="Click to open all source links where AI gathered information"
+                      >
+                        <ExternalLink className="size-3" />
+                        <span>Open All Sources</span>
+                      </button>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {m.sources.map((s, sIdx) => {
@@ -1122,11 +1136,14 @@ Ensure the paper contains:
                             key={sIdx}
                             href={s.url}
                             target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1 rounded-md border border-border/60 bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 hover:bg-muted/80 hover:border-primary/50 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-all shadow-xs"
                           >
-                            <span className="truncate max-w-[180px]">{s.title || domain}</span>
-                            <ExternalLink className="size-2.5 opacity-60" />
+                            <span className="font-medium">{domain}</span>
+                            {s.title && s.title !== domain && (
+                              <span className="truncate max-w-[170px] opacity-70">• {s.title}</span>
+                            )}
+                            <ExternalLink className="size-2.5 opacity-60 shrink-0" />
                           </a>
                         );
                       })}
@@ -1560,7 +1577,7 @@ Ensure the paper contains:
 
                         if (currentUrl.startsWith("data:")) {
                           const match = currentUrl.match(/^data:([^;]+);base64,(.+)$/);
-                          if (match) {
+                          if (match && match[1] && match[2]) {
                             mimeType = match[1];
                             base64Data = match[2];
                           }
@@ -1747,9 +1764,8 @@ Ensure the paper contains:
             ...prev,
             {
               name: `canvas_edit_${Date.now()}.png`,
-              type: "image/png",
-              data: base64,
-              size: base64.length,
+              mime: "image/png",
+              dataUrl: base64,
             },
           ]);
           toast.success("Attached edited canvas artwork to message prompt!");
