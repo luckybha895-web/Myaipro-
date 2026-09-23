@@ -53,6 +53,7 @@ import {
   formatINR,
   type UserSubscriptionState,
 } from "@/lib/subscription";
+import { verifyActiveSubscriptionOnLogin } from "@/lib/stripe";
 import { OnboardingPlanDialog } from "./OnboardingPlanDialog";
 import { PaymentModal } from "./PaymentModal";
 import { toast } from "sonner";
@@ -65,7 +66,7 @@ export function AppSidebar() {
   const [historyItems, setHistoryItems] = useState<UnifiedHistoryItem[]>([]);
   const [memorySummary, setMemorySummary] = useState<string>("");
   const [subscription, setSubscription] = useState<UserSubscriptionState>(() =>
-    getSubscription(user?.id || user?.email)
+    getSubscription(user?.id || user?.email),
   );
   const [planDialogOpen, setPlanDialogOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -97,6 +98,15 @@ export function AppSidebar() {
         setPlanDialogOpen(true);
       }, 600);
       return () => clearTimeout(timer);
+    }
+
+    // Verify active subscription upon login
+    if (user?.id || user?.email) {
+      verifyActiveSubscriptionOnLogin(user?.id, user?.email).then((res) => {
+        if (res.hasActiveSubscription) {
+          refreshSubscription();
+        }
+      });
     }
 
     // Check user memory context
@@ -356,13 +366,17 @@ export function AppSidebar() {
         <div className="rounded-xl border border-border/80 bg-gradient-to-b from-card to-muted/40 p-2.5 space-y-2 shadow-xs">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className={`size-2 rounded-full ${subscription.planId === "free" ? "bg-amber-500" : "bg-emerald-500 animate-pulse"}`} />
+              <span
+                className={`size-2 rounded-full ${subscription.planId === "free" ? "bg-amber-500" : "bg-emerald-500 animate-pulse"}`}
+              />
               <span className="text-xs font-bold text-foreground">
                 {SUBSCRIPTION_PLANS.find((p) => p.id === subscription.planId)?.name || "Free Trial"}
               </span>
             </div>
             <span className="text-[10px] font-extrabold text-primary font-mono">
-              {formatINR(SUBSCRIPTION_PLANS.find((p) => p.id === subscription.planId)?.priceINR || 0)}
+              {formatINR(
+                SUBSCRIPTION_PLANS.find((p) => p.id === subscription.planId)?.priceINR || 0,
+              )}
             </span>
           </div>
 
@@ -371,7 +385,8 @@ export function AppSidebar() {
             <div className="flex justify-between text-[10px] text-muted-foreground">
               <span>Tokens Used</span>
               <span className="font-mono font-medium text-foreground">
-                {subscription.tokensUsed.toLocaleString()} / {subscription.tokensLimit.toLocaleString()}
+                {subscription.tokensUsed.toLocaleString()} /{" "}
+                {subscription.tokensLimit.toLocaleString()}
               </span>
             </div>
             <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
@@ -390,8 +405,27 @@ export function AppSidebar() {
             </div>
           </div>
 
-          {/* Upgrade CTA for Free tier or limit reached */}
-          {subscription.planId === "free" || subscription.tokensUsed >= subscription.tokensLimit ? (
+          {/* Upgrade CTA for Free tier once they hit their limits */}
+          {subscription.planId === "free" && subscription.tokensUsed >= subscription.tokensLimit ? (
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-[11px] font-semibold text-destructive px-0.5">
+                <span className="flex items-center gap-1">
+                  <AlertTriangle className="size-3.5 text-destructive animate-pulse" />
+                  <span>Free limit reached</span>
+                </span>
+                <span className="font-mono text-[10px]">0 left</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPlanDialogOpen(true)}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs shadow-md transition-all cursor-pointer group active:scale-[0.98] ring-2 ring-amber-500/30"
+              >
+                <Zap className="size-3.5 fill-current text-slate-950" />
+                <span>Upgrade</span>
+                <ArrowUpRight className="size-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </button>
+            </div>
+          ) : subscription.planId === "free" ? (
             <button
               type="button"
               onClick={() => setPlanDialogOpen(true)}
@@ -399,7 +433,7 @@ export function AppSidebar() {
             >
               <div className="flex items-center gap-1.5">
                 <Crown className="size-3.5 text-amber-300" />
-                <span>{subscription.tokensUsed >= subscription.tokensLimit ? "Limit Reached • Upgrade" : "Upgrade from ₹199"}</span>
+                <span>Upgrade from ₹199</span>
               </div>
               <ArrowUpRight className="size-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
             </button>
@@ -460,6 +494,7 @@ export function AppSidebar() {
         open={planDialogOpen}
         onOpenChange={setPlanDialogOpen}
         userId={user?.id || user?.email}
+        userEmail={user?.email}
         onPlanSelected={() => {
           refreshSubscription();
         }}
@@ -471,6 +506,7 @@ export function AppSidebar() {
         onOpenChange={setPaymentModalOpen}
         selectedPlan={SUBSCRIPTION_PLANS[1]}
         userId={user?.id || user?.email}
+        userEmail={user?.email}
         onSuccess={() => {
           refreshSubscription();
         }}

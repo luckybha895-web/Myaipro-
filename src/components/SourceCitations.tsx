@@ -45,9 +45,7 @@ export function getCleanSourceLabel(source: GroundedSourceItem): string {
   }
   if (source.title && source.title.trim()) {
     // If title has site name, shorten it
-    const cleanTitle = source.title
-      .replace(/\s*[-–|•]\s*.*$/, "")
-      .trim();
+    const cleanTitle = source.title.replace(/\s*[-–|•]\s*.*$/, "").trim();
     if (cleanTitle.length <= 28) return cleanTitle;
   }
   return domain;
@@ -60,9 +58,27 @@ interface SourceCitationsProps {
 }
 
 /**
- * High-fidelity Sources & Citations component matching the modern AI assistant layout:
- * - Stacked cluster of application & website favicons + "Sources" title
- * - Pill-style source chips displaying app logo, title, and citation count (+1)
+ * Helper to remove raw link dumps, "Sources: 1. http..." or citation blocks from the main
+ * message body so they are presented cleanly only in the sleek modern pill/sources layout.
+ */
+export function stripRawLinksFromText(text: string): string {
+  if (!text) return "";
+  return text
+    .replace(
+      /(?:###?\s*(?:Sources|References|Citations|Web Sources|Consulted Links)[\s\S]*$)/gi,
+      "",
+    )
+    .replace(
+      /(?:\n\n(?:Sources|References|Citations):\s*\n(?:[-*\d.]+\s*(?:\[.*?\]\(https?:\/\/.*?\)|\(?https?:\/\/.*?\))\s*\n*)+$)/gi,
+      "",
+    )
+    .trim();
+}
+
+/**
+ * High-fidelity Sources & Citations component matching Screenshot 2 (ChatGPT / modern AI assistant):
+ * - Top: Clean pill-style source chips displaying app logo, title, and citation count (+1)
+ * - Bottom: Minimalist stacked cluster of application & website favicons + "Sources" title
  */
 export function SourceCitations({ sources, className = "", onOpenAll }: SourceCitationsProps) {
   if (!sources || sources.length === 0) return null;
@@ -83,66 +99,10 @@ export function SourceCitations({ sources, className = "", onOpenAll }: SourceCi
   }
 
   return (
-    <div className={`mt-3.5 space-y-2.5 pt-2.5 border-t border-border/50 ${className}`}>
-      {/* Cluster of site/app logos followed by "Sources" */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          {/* Overlapping circular brand logos */}
-          <div className="flex -space-x-1.5 items-center">
-            {domainSources.slice(0, 4).map((item, idx) => {
-              const favicon = getFaviconUrl(item.url);
-              const domain = getDomainFromUrl(item.url);
-              return (
-                <div
-                  key={idx}
-                  className="relative size-5 rounded-full border border-background bg-muted/80 shadow-xs overflow-hidden flex items-center justify-center p-0.5"
-                  title={domain}
-                >
-                  <img
-                    src={favicon}
-                    alt={domain}
-                    className="size-full object-contain rounded-full"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => {
-                      (e.target as HTMLElement).style.display = "none";
-                    }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-
-          <span className="text-xs font-semibold text-foreground/90 tracking-tight flex items-center gap-1">
-            <span>Sources</span>
-            <span className="text-[11px] text-muted-foreground font-normal">
-              ({validSources.length})
-            </span>
-          </span>
-        </div>
-
-        {validSources.length > 1 && (
-          <button
-            type="button"
-            onClick={() => {
-              if (onOpenAll) {
-                onOpenAll();
-              } else {
-                validSources.forEach((s) => {
-                  window.open(s.url, "_blank", "noopener,noreferrer");
-                });
-              }
-            }}
-            className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card/60 hover:bg-muted/80 px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            <ExternalLink className="size-2.5" />
-            <span>Open all</span>
-          </button>
-        )}
-      </div>
-
-      {/* Pill-style chips matching Screenshot: [App Logo] Name +1 */}
-      <div className="flex flex-wrap gap-1.5">
-        {validSources.map((s, idx) => {
+    <div className={`mt-3 space-y-2.5 pt-2 ${className}`}>
+      {/* 1. Pill-style chips matching Screenshot 2: [App Logo] Name +1 */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {validSources.slice(0, 6).map((s, idx) => {
           const domain = getDomainFromUrl(s.url);
           const label = getCleanSourceLabel(s);
           const favicon = getFaviconUrl(s.url);
@@ -153,7 +113,7 @@ export function SourceCitations({ sources, className = "", onOpenAll }: SourceCi
               href={s.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex items-center gap-1.5 rounded-full border border-border/80 bg-card/80 hover:bg-accent/80 hover:border-primary/50 px-2.5 py-1 text-xs text-foreground/90 transition-all shadow-2xs hover:shadow-xs active:scale-[0.98]"
+              className="group inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-card/70 dark:bg-card/40 hover:bg-accent/80 hover:border-primary/50 px-2.5 py-1 text-xs text-foreground/90 transition-all shadow-2xs hover:shadow-xs active:scale-[0.98]"
               title={s.title || s.url}
             >
               <div className="size-3.5 shrink-0 rounded-full bg-muted/60 overflow-hidden flex items-center justify-center">
@@ -172,13 +132,79 @@ export function SourceCitations({ sources, className = "", onOpenAll }: SourceCi
                 {label}
               </span>
 
-              {/* +1 citation marker as seen in the user screenshot */}
-              <span className="text-[10px] text-muted-foreground/80 font-mono font-semibold group-hover:text-primary">
+              {/* +1 citation badge matching Screenshot 2 */}
+              <span className="text-[10px] text-muted-foreground/70 font-mono font-medium group-hover:text-primary">
                 +1
               </span>
             </a>
           );
         })}
+      </div>
+
+      {/* 2. Below the chips: Overlapping circular favicons followed by "Sources" */}
+      <div className="flex items-center justify-between gap-2 pt-0.5">
+        <div className="flex items-center gap-2">
+          {/* Overlapping circular brand logos */}
+          <div className="flex -space-x-1.5 items-center">
+            {domainSources.slice(0, 4).map((item, idx) => {
+              const favicon = getFaviconUrl(item.url);
+              const domain = getDomainFromUrl(item.url);
+              return (
+                <div
+                  key={idx}
+                  className="relative size-4.5 rounded-full border border-background bg-muted/80 shadow-2xs overflow-hidden flex items-center justify-center p-0.5"
+                  title={domain}
+                >
+                  <img
+                    src={favicon}
+                    alt={domain}
+                    className="size-full object-contain rounded-full"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.display = "none";
+                    }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenAll) {
+                onOpenAll();
+              } else if (validSources[0]) {
+                window.open(validSources[0].url, "_blank", "noopener,noreferrer");
+              }
+            }}
+            className="text-xs font-semibold text-foreground/85 hover:text-foreground tracking-tight flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <span>Sources</span>
+            <span className="text-[10px] text-muted-foreground font-normal">
+              ({validSources.length})
+            </span>
+          </button>
+        </div>
+
+        {validSources.length > 1 && (
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenAll) {
+                onOpenAll();
+              } else {
+                validSources.forEach((s) => {
+                  window.open(s.url, "_blank", "noopener,noreferrer");
+                });
+              }
+            }}
+            className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-card/50 hover:bg-muted/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+          >
+            <ExternalLink className="size-2.5" />
+            <span>Open all</span>
+          </button>
+        )}
       </div>
     </div>
   );

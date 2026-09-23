@@ -107,7 +107,6 @@ export const CONNECTORS: ConnectorApp[] = [
   app("vercel", "Vercel", "Deploy", "▲", f.token, "Deploy the app you just built."),
   app("netlify", "Netlify", "Deploy", "🌐", f.token, "One-click hosting for your build."),
   app("cloudflare", "Cloudflare", "Deploy", "🛡️", f.key, "DNS, caching and workers."),
-  app("aws", "AWS", "Cloud", "☁️", f.keySecret, "S3, Lambda and more."),
   app("azure", "Azure", "Cloud", "🔷", f.key, "Cloud storage and functions."),
   app("gcp", "Google Cloud", "Cloud", "🌥️", f.key, "Buckets, functions and BigQuery."),
   app("supabase", "Supabase", "Database", "⚡", f.key, "Store every project, chat and file."),

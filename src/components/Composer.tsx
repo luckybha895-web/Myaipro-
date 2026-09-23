@@ -281,23 +281,45 @@ export function Composer({
   return (
     <div className="glow-panel rounded-3xl p-2">
       {safeAttachments.length > 0 && (
-        <div className="flex flex-wrap gap-2 p-2">
-          {safeAttachments.map((a, i) => (
-            <span
-              key={`${a.name}-${i}`}
-              className="flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground"
-            >
-              <Paperclip className="size-3" />
-              {a.name.length > 22 ? `${a.name.slice(0, 20)}…` : a.name}
-              <button
-                type="button"
-                onClick={() => handleAttachments(safeAttachments.filter((_, idx) => idx !== i))}
-                aria-label={`Remove ${a.name}`}
+        <div className="flex flex-wrap items-center gap-2.5 p-2">
+          {safeAttachments.map((a, i) => {
+            const isImage = a.mime.startsWith("image/") || a.data?.startsWith("data:image/");
+            if (isImage && a.data) {
+              return (
+                <div
+                  key={`${a.name}-${i}`}
+                  className="group relative size-16 shrink-0 overflow-hidden rounded-2xl border border-border/80 bg-muted/60 shadow-sm"
+                >
+                  <img src={a.data} alt={a.name} className="size-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => handleAttachments(safeAttachments.filter((_, idx) => idx !== i))}
+                    className="absolute right-1 top-1 flex size-5 items-center justify-center rounded-full bg-black/70 text-white transition hover:bg-black"
+                    aria-label={`Remove ${a.name}`}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              );
+            }
+
+            return (
+              <span
+                key={`${a.name}-${i}`}
+                className="flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs text-secondary-foreground"
               >
-                <X className="size-3" />
-              </button>
-            </span>
-          ))}
+                <Paperclip className="size-3" />
+                {a.name.length > 22 ? `${a.name.slice(0, 20)}…` : a.name}
+                <button
+                  type="button"
+                  onClick={() => handleAttachments(safeAttachments.filter((_, idx) => idx !== i))}
+                  aria-label={`Remove ${a.name}`}
+                >
+                  <X className="size-3" />
+                </button>
+              </span>
+            );
+          })}
         </div>
       )}
 

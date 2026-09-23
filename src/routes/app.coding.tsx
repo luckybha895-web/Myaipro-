@@ -254,6 +254,18 @@ CREATE INDEX IF NOT EXISTS idx_telemetry_device ON telemetry_events(device_id);
 
 const OPEN_SOURCE_MODELS = [
   {
+    id: "glm-5.3-coder",
+    name: "GLM 5.3 Coder (THUDM / Zhipu AI Open Source SOTA)",
+    tag: "GLM 5.3 SOTA",
+    desc: "Open-source flagship code model with deep multi-step reasoning and zero-defect synthesis",
+  },
+  {
+    id: "mtplx-coder-mtp",
+    name: "MTPLX Coder MTP (github.com/youssofal/MTPLX)",
+    tag: "MTP Speculative SOTA",
+    desc: "Multi-Token Prediction speculative decoding for accelerated code joining",
+  },
+  {
     id: "qwen-code-sota",
     name: "Qwen 2.5 Coder 72B (Open Source SOTA)",
     tag: "Open Source SOTA",
@@ -293,7 +305,7 @@ const OPEN_SOURCE_MODELS = [
 
 export function CodingStudio() {
   const { selectedModel: globalModel, setSelectedModel: setGlobalModel } = useAi();
-  const [selectedModel, setSelectedModel] = useState("qwen-code-sota");
+  const [selectedModel, setSelectedModel] = useState("glm-5.3-coder");
   const [selectedLanguage, setSelectedLanguage] = useState<"react" | "python" | "html" | "sql">(
     "react",
   );
@@ -304,7 +316,7 @@ export function CodingStudio() {
   const [activeTab, setActiveTab] = useState<"editor" | "preview" | "terminal">("editor");
   const [terminalLogs, setTerminalLogs] = useState<string[]>([
     "[SYSTEM] AI Coding Studio initialized.",
-    `[ENGINE] Active Code Engine: Qwen 2.5 Coder 72B (Open Source)`,
+    `[ENGINE] Active Code Engine: GLM 5.3 Coder (THUDM / Zhipu AI Open Source SOTA)`,
     "[COMPILER] Syntax verification active. Ready for generation and refactoring.",
   ]);
   const [previewKey, setPreviewKey] = useState(0);
@@ -355,7 +367,7 @@ export function CodingStudio() {
 
     addLog(`[ACTION] ${actionNames[actionType]} using model "${selectedModel}"...`);
 
-    let systemInstruction = `You are an expert Principal Software Engineer and Polyglot Architect (Specializing in Qwen 2.5 Coder and DeepSeek Coder architecture).
+    let systemInstruction = `You are an expert Principal Software Engineer and Polyglot Architect (Specializing in GLM 5.3 Coder, Qwen 2.5 Coder, and DeepSeek Coder architecture).
 CRITICAL RULES:
 1. Always write complete, production-ready, beautiful, modern code.
 2. Never output placeholders, "// TODO", or truncated snippets. Write every single line.

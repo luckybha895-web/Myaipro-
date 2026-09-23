@@ -42,16 +42,9 @@ export const FEATURES: Feature[] = [
     icon: Presentation,
   },
   {
-    to: "/app/database",
-    label: "AWS & Databases",
-    desc: "Production AWS RDS, PostgreSQL, MySQL & DynamoDB cloud connections",
-    icon: Database,
-  },
-  {
     to: "/app/coding",
     label: "AI Coding Studio",
     desc: "Deep code generation, live sandbox, games & autonomous debugging",
     icon: Code2,
   },
 ];
-

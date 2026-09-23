@@ -31,6 +31,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userId?: string | null;
+  userEmail?: string | null;
   onPlanSelected?: (plan: SubscriptionPlan) => void;
 }
 
@@ -38,10 +39,12 @@ export function OnboardingPlanDialog({
   open,
   onOpenChange,
   userId,
+  userEmail,
   onPlanSelected,
 }: Props) {
-  const [selectedPlanForPayment, setSelectedPlanForPayment] =
-    useState<SubscriptionPlan | null>(null);
+  const [selectedPlanForPayment, setSelectedPlanForPayment] = useState<SubscriptionPlan | null>(
+    null,
+  );
   const [paymentOpen, setPaymentOpen] = useState(false);
 
   const handleSelectPlan = (plan: SubscriptionPlan) => {
@@ -78,7 +81,8 @@ export function OnboardingPlanDialog({
               Select Your Plan to Get Started
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-xl mx-auto">
-              Choose the tier that fits your creative &amp; engineering workflow. You can upgrade, downgrade, or cancel anytime. All prices are in Indian Rupees (₹).
+              Choose the tier that fits your creative &amp; engineering workflow. You can upgrade,
+              downgrade, or cancel anytime. All prices are in Indian Rupees (₹).
             </DialogDescription>
           </div>
 
@@ -176,7 +180,9 @@ export function OnboardingPlanDialog({
           <div className="border-t border-border/70 p-3.5 bg-muted/20 flex flex-col sm:flex-row items-center justify-between gap-2 text-[11px] text-muted-foreground shrink-0">
             <div className="flex items-center gap-2">
               <ShieldCheck className="size-4 text-emerald-500" />
-              <span>100% Secure Payments via UPI (GPay/PhonePe), RuPay, Cards &amp; NetBanking.</span>
+              <span>
+                100% Secure Payments via Stripe, UPI (GPay/PhonePe), RuPay, Cards &amp; NetBanking.
+              </span>
             </div>
             <button
               onClick={() => {
@@ -198,6 +204,7 @@ export function OnboardingPlanDialog({
           onOpenChange={setPaymentOpen}
           selectedPlan={selectedPlanForPayment}
           userId={userId}
+          userEmail={userEmail}
           onSuccess={handlePaymentSuccess}
         />
       )}

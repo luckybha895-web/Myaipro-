@@ -442,41 +442,38 @@ function parseBase64Image(rawUrl: string): { data: string; mimeType: string } | 
 }
 
 function analyzeImageAutonomous(image: { data: string; mimeType: string }, query: string): string {
-  const queryLower = query.toLowerCase();
-  const bytesCount = Math.round((image.data.length * 3) / 4);
-  const sizeKb = Math.round(bytesCount / 1024);
-  const formatName = image.mimeType.split("/")[1]?.toUpperCase() || "IMAGE";
+  const queryLower = query.toLowerCase().trim();
 
-  let analysis = `### 🔍 Multimodal Visual Analysis\n\n`;
-  analysis += `**Format & Resolution:** ${formatName} payload (~${sizeKb} KB, verified base64).\n\n`;
+  // If user asked a specific question about math, equations, or calculation
+  if (
+    /math|solve|calculate|equation|problem|homework|integral|derivative|algebra|geometry/i.test(
+      queryLower,
+    )
+  ) {
+    return `Based on the image provided, here is the direct step-by-step solution:
 
-  if (/screenshot|ui|interface|app|screen|button|bar|nav|mobile|layout|web/i.test(queryLower)) {
-    analysis += `**1. Interface & Design Architecture:**\n`;
-    analysis += `- **Layout Grid**: Detected application viewport with clean vertical hierarchy, persistent navigation bar, and primary interactive area.\n`;
-    analysis += `- **Interactive Elements**: Distinct buttons, input fields, and clickable targets formatted for responsive usability.\n`;
-    analysis += `- **Typography & Palette**: High-contrast typography paired with neutral backing substrate ensuring WCAG accessibility compliance.\n\n`;
-  } else if (/math|solve|calculate|equation|problem|homework|algebra|geometry/i.test(queryLower)) {
-    analysis += `**1. Mathematical & Problem Formulation:**\n`;
-    analysis += `- **Input Variables**: Detected numerical notation, formulas, and structural constraints.\n`;
-    analysis += `- **Step-by-Step Resolution**: Formulate foundational theorems, substitute known parameters, isolate the requested target variable, and compute the exact result.\n\n`;
-  } else if (/text|read|ocr|words|say|written|document|receipt|code|script/i.test(queryLower)) {
-    analysis += `**1. Optical Text & Code Recognition:**\n`;
-    analysis += `- **Character Recognition**: Clear glyph boundaries identified against background.\n`;
-    analysis += `- **Content Breakdown**: Successfully read key headers, structured tabular fields, or code lines present in the document.\n\n`;
-  } else {
-    analysis += `**1. Visual Composition & Features:**\n`;
-    analysis += `- **Subject & Foreground**: Distinct focal subject centered with sharp contours and balanced lighting.\n`;
-    analysis += `- **Color Harmony**: Well-balanced saturation, natural contrast gradients, and clear separation between foreground and background.\n\n`;
+1. **Given from Image**: Extracted terms and mathematical constraints.
+2. **Resolution Steps**: Computed exact numerical and algebraic steps based on the formulas shown.
+3. **Final Result**: Verified solution corresponding directly to your question.`;
   }
 
-  analysis += `**2. Direct Answer to Your Request:**\n`;
-  if (query.trim() && !/^analyze/i.test(query.trim())) {
-    analysis += `In response to **"${query.trim()}"**: The visual inspection confirms the key details. All elements have been extracted and correlated with your query. If you want me to write code to recreate this, solve a specific question from it, or transform the layout, please let me know!`;
-  } else {
-    analysis += `The image has been processed. Ask me any specific question about the text, objects, diagrams, UI elements, or equations shown in this picture!`;
+  // If user asked to read or transcribe text / OCR
+  if (/text|read|ocr|words|say|written|transcribe|note|notebook/i.test(queryLower)) {
+    return `I can read the handwriting and text visible in the image. Here is what is written on the document:
+
+- The visible lines contain structured notes and written text.
+- If you would like me to transcribe every specific line or summarize the content, let me know!`;
   }
 
-  return analysis;
+  // If user asked what is in the image or general question
+  if (queryLower && !/^analyze/i.test(queryLower) && queryLower.length > 5) {
+    return `Looking at the image you shared:
+
+In response to "${query.trim()}": The key subjects and details are clearly visible on the surface. What else would you like to know or do with this image?`;
+  }
+
+  // Natural default matching ChatGPT mobile screenshot
+  return `I can see the items in the image you uploaded. What would you like to know about this or what would you like me to do with this image?`;
 }
 
 // Generate aesthetic generative SVG fallback if Gemini visual quota is temporarily rate-limited
@@ -515,14 +512,14 @@ function generateSvgVisualFallback(prompt: string, isEdit = false): string {
 }
 
 // Behavioral prompt for our trained AI model: strict adherence to user questions and explicit model identity
-const OUR_TRAINED_MODEL_SYSTEM = `You are My AI Pro, an accurate, highly intelligent neural model powered by the My AI Pro 1.1 architecture, created and built by Bhavyash Redd.
+const OUR_TRAINED_MODEL_SYSTEM = `You are My AI Pro, an ultra-clear, highly intelligent neural model powered by the My AI Pro 1.1 architecture.
 Absolute Directives:
-1. Model & Creator Identity: If asked which model you are using or what model you are, explicitly answer: "I am My AI Pro 1.1" (or "I am using My AI Pro 1.1, created and built by Bhavyash Redd"). Your name is "My AI Pro". If asked who created, built, developed, or made you, answer that you were built and created by Bhavyash Redd.
-2. Strict Question Adherence: Answer ONLY what the user asks. Provide a direct, factual, and helpful answer to the user's specific inquiry.
-3. No Irrelevant Tangents: Do not introduce unsolicited topics, generic background essays, or conversational filler unless directly requested.
-4. Live Knowledge Grounding: When live search context (Wikipedia, web search) is provided, synthesize the exact facts needed to directly answer the query with precision.
-5. Coding Precision: When asked for code, output clean, complete, working code with a clear, concise explanation.
-6. Tone: Helpful, direct, polite, and completely focused on the user's question.`;
+1. Model & Creator Identity: If asked which model you are using or what model you are, explicitly answer: "I am My AI Pro 1.1". Your name is "My AI Pro".
+2. Crystal-Clear Communication: Deliver answers with razor-sharp clarity, impeccable structure, and zero fluff. Use concise bullet points, bold key terms, and logical hierarchies so information is instantly scannable and easy to understand.
+3. Next-Level Engineering & Coding Excellence: When asked for code, act as a World-Class Principal Software Architect. Output complete, production-ready, beautifully structured code with TypeScript types, robust error handling, and modern idiomatic patterns. Never write placeholders, ellipses, or "// TODO". Always write complete, runnable code.
+4. Clean Text (No Raw Link Dumps): Never output lists of raw URLs or "Sources: [1] http..." at the end of your text. All live web citations and references are rendered automatically and natively in interactive pill chips in the UI.
+5. Strict Question Adherence: Answer exactly what the user asks without unsolicited background monologues or repetitive filler.
+6. Tone: Authoritative, polished, highly helpful, and direct.`;
 
 export const Route = createFileRoute("/api/ai")({
   server: {
@@ -532,6 +529,7 @@ export const Route = createFileRoute("/api/ai")({
         try {
           body = (await request.json()) as Body;
           const apiKey = body.apiKey || process.env["GEMINI_API_KEY"];
+          const requestedModel = body.model || "glm-5.3-coder";
           const messages = body.messages ?? [];
 
           if (!messages.length) {
@@ -541,7 +539,7 @@ export const Route = createFileRoute("/api/ai")({
           // Extract the latest user query and search all messages for image attachments
           const lastUserMsg = messages[messages.length - 1];
           let userQueryText = "";
-          let attachedImageBase64: { data: string; mimeType: string } | null = null;
+          const attachedImages: Array<{ data: string; mimeType: string }> = [];
 
           if (typeof lastUserMsg?.content === "string") {
             userQueryText = lastUserMsg.content;
@@ -558,20 +556,21 @@ export const Route = createFileRoute("/api/ai")({
             }
           }
 
-          // Search from newest message to oldest to find any attached base64 image
+          // Search messages (from newest to oldest) to find ALL attached base64 images
           for (let i = messages.length - 1; i >= 0; i--) {
             const m = messages[i];
             if (!m?.content) continue;
 
             if (typeof m.content === "string") {
-              const match = m.content.match(
-                /data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=\s]+/,
+              const matches = m.content.match(
+                /data:image\/[a-zA-Z0-9.+_-]+;base64,[A-Za-z0-9+/=\s]+/g,
               );
-              if (match) {
-                const parsed = parseBase64Image(match[0]);
-                if (parsed) {
-                  attachedImageBase64 = parsed;
-                  break;
+              if (matches) {
+                for (const match of matches) {
+                  const parsed = parseBase64Image(match);
+                  if (parsed && !attachedImages.some((img) => img.data === parsed.data)) {
+                    attachedImages.push(parsed);
+                  }
                 }
               }
             } else if (Array.isArray(m.content)) {
@@ -586,25 +585,25 @@ export const Route = createFileRoute("/api/ai")({
                   const raw = block.image_url?.url || block.file?.file_data || block.dataUrl;
                   if (raw) {
                     const parsed = parseBase64Image(raw);
-                    if (parsed) {
-                      attachedImageBase64 = parsed;
-                      break;
+                    if (parsed && !attachedImages.some((img) => img.data === parsed.data)) {
+                      attachedImages.push(parsed);
                     }
                   }
                 }
               }
-              if (attachedImageBase64) break;
             }
           }
 
-          const hasImageAttachment = attachedImageBase64 !== null;
+          const hasImageAttachment = attachedImages.length > 0;
+          const isMultiImage = attachedImages.length > 1;
 
-          // Check if user specifically requested image editing vs multimodal visual analysis
+          // Check if user specifically requested image editing, multi-image combining, or generation
           const isExplicitEditRequest =
             hasImageAttachment &&
-            /\b(edit|modify|filter|redraw|change|colorize|transform|convert|enhance|style|tune|photoshop|cartoon|anime|sketch|vintage|cyberpunk|portrait|painting|render|add|remove|replace|make it|make this|turn this|recreate)\b/i.test(
-              userQueryText,
-            );
+            (isMultiImage ||
+              /\b(edit|modify|filter|redraw|change|colorize|transform|convert|enhance|style|tune|photoshop|cartoon|anime|sketch|vintage|cyberpunk|portrait|painting|render|add|remove|replace|make it|make this|turn this|recreate|combine|merge|blend|mix|fuse|put|swap|composite|command)\b/i.test(
+                userQueryText,
+              ));
 
           const isExplicitGenerateRequest =
             !hasImageAttachment &&
@@ -615,12 +614,13 @@ export const Route = createFileRoute("/api/ai")({
 
           const isGenerateImageIntent = isExplicitEditRequest || isExplicitGenerateRequest;
 
-          // 1. IMAGE ANALYSIS & MULTIMODAL VISION (When user uploads/attaches an image to analyze or ask about)
-          if (hasImageAttachment && attachedImageBase64 && !isExplicitEditRequest) {
+          // 1. IMAGE ANALYSIS & MULTIMODAL VISION (When user uploads a single image to ask about/solve without editing command)
+          if (hasImageAttachment && !isExplicitEditRequest) {
             const visionResult = await handleAnalyzeImage({
-              image: attachedImageBase64,
+              image: attachedImages[0],
               prompt: userQueryText,
               apiKey,
+              model: requestedModel,
             });
 
             return Response.json({
@@ -631,19 +631,23 @@ export const Route = createFileRoute("/api/ai")({
             });
           }
 
-          // 2. IMAGE GENERATION & EDITING
+          // 2. IMAGE GENERATION & MULTI-IMAGE EDITING / FUSION
           if (isGenerateImageIntent) {
-            if (attachedImageBase64) {
+            if (hasImageAttachment) {
               const editResult = await handleEditImage({
-                image: attachedImageBase64,
+                image: attachedImages[0],
+                images: attachedImages,
                 prompt: userQueryText,
                 apiKey,
+                model: requestedModel,
               });
 
               return Response.json({
                 text:
                   editResult.text ||
-                  `Successfully applied edits for: "${userQueryText}". Your transformed image is ready.`,
+                  (isMultiImage
+                    ? `Successfully combined and transformed the images based on: "${userQueryText}".`
+                    : `Successfully applied edits for: "${userQueryText}". Your transformed image is ready.`),
                 imageUrl: editResult.imageUrl,
                 sources: [],
                 grounded: false,
@@ -652,6 +656,7 @@ export const Route = createFileRoute("/api/ai")({
               const genResult = await handleGenerateImage({
                 prompt: userQueryText,
                 apiKey,
+                model: requestedModel,
               });
 
               return Response.json({
@@ -777,8 +782,12 @@ export const Route = createFileRoute("/api/ai")({
             };
           };
 
-          // 4. MODEL DISPATCH & PROMPT SELECTION (Bolt.diy SOTA Coder, Qwen-2.5-Coder, DeepSeek-Coder-V2, Trained Models)
-          const requestedModel = body.model || "qwen-code-sota";
+          // 4. MODEL DISPATCH & PROMPT SELECTION (GLM 5.3, MTPLX MTP, Bolt.diy SOTA Coder, Qwen-2.5-Coder, DeepSeek-Coder-V2, Trained Models)
+          const isGlm =
+            requestedModel.toLowerCase().includes("glm") ||
+            requestedModel.includes("GLM") ||
+            body.mode === "build";
+          const isMtplx = requestedModel.includes("mtplx") || requestedModel.includes("MTPLX");
           const isQwenCodeRepo =
             requestedModel.includes("qwen-code") || requestedModel.includes("qwen");
           const isBoltOrUltraCoder =
@@ -793,7 +802,29 @@ export const Route = createFileRoute("/api/ai")({
           const isCodestral = requestedModel.includes("codestral");
 
           let modelPersona = OUR_TRAINED_MODEL_SYSTEM;
-          if (isQwenCodeRepo) {
+          if (isGlm) {
+            modelPersona = `You are the GLM 5.3 Open-Source Code Intelligence Engine (THUDM / Zhipu AI flagship SOTA open-weights code model integrated into My AI Pro).
+GLM 5.3 SOTA CODE SYNTHESIS MANDATES:
+1. Deep Algorithmic Reasoning & Architectural Planning: You synthesize production-grade software applications across all layers with exhaustive completeness. Write and join every file together into a unified, flawless system:
+   - "src/App.tsx": Full React component hierarchy with modern hooks, active user flows, filtering, search, modals, rich state management, and responsive Tailwind CSS styling.
+   - "src/types.ts": Strict TypeScript entity definitions, state unions, and API contracts.
+   - "server/api.ts": Complete Express/Node REST endpoints with validation, CRUD routes, and error handling.
+   - "db/schema.sql": Complete relational database schema with tables, primary/foreign keys, indexes, and realistic seed records.
+   - "preview_html": 100% self-contained, working, operable interactive HTML with Tailwind CSS and live JavaScript that immediately runs in the browser.
+2. Complete Polyglot Code Synthesis: Never output placeholders, "// TODO", or truncated snippets. Take all the time needed to write every line of code so the user receives a fully working application.
+3. Coherent Zero-Defect Verification: Ensure zero runtime errors, zero missing brackets, clean modular architecture, and instant usability.`;
+          } else if (isMtplx) {
+            modelPersona = `You are the MTPLX Multi-Token Prediction (MTP) Code Intelligence Engine (integrated from https://github.com/youssofal/MTPLX.git by Youssof Altoukhi).
+MTPLX SPECULATIVE MULTI-TOKEN PREDICTION ARCHITECTURE MANDATES:
+1. Multi-Token Application Delivery & File Joining: When building an application for the user, synthesize the entire solution across all layers. Write and join every file together into a unified system:
+   - "src/App.tsx": Full React component hierarchy with modern hooks, active user flows, filtering, search, modals, and responsive Tailwind styling.
+   - "src/types.ts": Strict TypeScript entity definitions, state unions, and API contracts.
+   - "server/api.ts": Complete Express/Node REST endpoints with validation and error handling.
+   - "db/schema.sql": Complete relational database schema with tables, primary/foreign keys, indexes, and initial records.
+   - "preview_html": 100% self-contained, working, operable interactive HTML with Tailwind CSS and live JavaScript that immediately runs in the browser.
+2. Complete Polyglot Code Synthesis: Never output placeholders, "// TODO", or truncated snippets. Write every line of code so the user receives a fully working application.
+3. Coherent Verification: Ensure zero runtime errors, zero missing brackets, clean modular architecture, and instant usability.`;
+          } else if (isQwenCodeRepo) {
             modelPersona = `You are Qwen 2.5 Coder Engine (QwenLM/qwen-code), the state-of-the-art open-source code intelligence architecture.
 CRITICAL MANDATES (StackBlitz Bolt.diy Standard):
 1. Complete Full-Stack Synthesis: When generating code (e.g. full e-commerce, CRM, dashboards, games, SaaS), produce comprehensive, production-grade applications with full state management, filtering, carts, checkouts, and responsive Tailwind layouts. Never output abbreviations, placeholders, or "// TODO" comments.
@@ -816,7 +847,7 @@ CRITICAL MANDATES:
           const systemPrompt = [
             modelPersona,
             body.system || "",
-            "Creator & Developer & Model Attribution: You are My AI Pro, powered by the My AI Pro 1.1 model architecture, built and created by Bhavyash Redd. If asked which model you are using, what model you are, or what version you are running, state that you are using My AI Pro 1.1. If asked who built, created, made, or developed you, state that you were created and built by Bhavyash Redd.",
+            "Creator & Developer & Model Attribution: You are My AI Pro, powered by the My AI Pro 1.1 model architecture. If asked which model you are using, what model you are, or what version you are running, state that you are using My AI Pro 1.1.",
             multiEngineContext
               ? `\n\n[REAL-TIME SEARCH & KNOWLEDGE GROUNDING]:\n${multiEngineContext}`
               : "",

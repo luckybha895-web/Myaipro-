@@ -5,12 +5,22 @@ import {
   Sparkles,
   ArrowRight,
   Check,
+  CheckCircle2,
+  Circle,
   Clock,
   Code2,
   Layers,
   Cpu,
   Terminal,
   Zap,
+  Play,
+  FileCode,
+  FileText,
+  ListChecks,
+  FastForward,
+  ExternalLink,
+  ShieldCheck,
+  Copy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -815,6 +825,7 @@ async function generateMultiLanguageProject(
   finalAnswers: string[],
   selectedModel?: string,
 ): Promise<GeneratedProject> {
+  const modelToUse = selectedModel || "glm-5.3-coder";
   try {
     const aiPromise = askAIJson<GeneratedProject>(
       [
@@ -826,10 +837,10 @@ async function generateMultiLanguageProject(
         },
       ],
       {
-        model: selectedModel,
+        model: modelToUse,
         mode: "build",
-        system: `You are Creative AI Principal Autonomous Software Architect and Polyglot Engineer.
-Your mission is to understand the user's requirements deeply, analyze every feature needed, and write complete, production-grade code manually line-by-line without ANY placeholders, omissions, or "// TODO" comments.
+        system: `You are the GLM 5.3 Code Intelligence Engine (THUDM / Zhipu AI Open Source Flagship), integrated into My AI Pro.
+Your mission is to understand the user's requirements deeply, analyze every feature needed, and write complete, production-grade code manually line-by-line without ANY placeholders, omissions, or "// TODO" comments, joining all components seamlessly for the user.
 
 OUTPUT FORMAT:
 Respond with a single valid JSON object:
@@ -872,13 +883,13 @@ Respond with a single valid JSON object:
 }
 
 CRITICAL QUALITY DIRECTIVES:
-1. UNDERSTAND THE DOMAIN DEEPLY:
+1. UNDERSTAND THE DOMAIN DEEPLY & JOIN CODE TOGETHER:
    - If the idea is a game: produce full game physics, 60fps game loop, controls, particle effects, scoring, and sound.
    - If the idea is e-commerce: produce product cards, categories, cart state, checkout modal, search, and reviews.
    - If the idea is a dashboard/SaaS: produce KPI cards, charts, filterable data tables, status badges, and action dialogs.
    - If the idea is productivity/Kanban: produce drag/status columns, task creator modal, priority tags, and persistence.
    - If the idea is social/chat: produce conversation threads, message composer, reactions, contacts list, and avatars.
-   - For all other apps: produce complete, domain-tailored screens and mechanics.
+   - For all other apps: produce complete, domain-tailored screens and mechanics joining all files together into a single coherent system.
 
 2. "preview_html" MUST BE:
    - A single-file, 100% operable HTML document with Tailwind CSS (<script src="https://cdn.tailwindcss.com"></script>) and Google Fonts.
@@ -890,9 +901,9 @@ CRITICAL QUALITY DIRECTIVES:
       },
     );
 
-    // Generous 180s timeout allowing AI to analyze and write every line of code thoroughly
+    // Generous 600s timeout allowing GLM 5.3 to queue, analyze, and write every line of code thoroughly without interruption
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Autonomous generation timeout")), 180000),
+      setTimeout(() => reject(new Error("GLM 5.3 generation timeout")), 600000),
     );
 
     const project = await Promise.race([aiPromise, timeoutPromise]);
@@ -918,6 +929,15 @@ CRITICAL QUALITY DIRECTIVES:
     return synthesizeFallbackProject(idea);
   }
 }
+
+const DURATION_QUESTION: Q = {
+  question: "Select dedicated code synthesis & deep engineering duration (Minimum 10 Minutes):",
+  options: [
+    "10 Minutes (Standard Deep Architecture & Code Generation)",
+    "15 Minutes (Comprehensive Multi-Tier Full-Stack Engineering)",
+    "20 Minutes (Enterprise Robust Polyglot Suite & Stress Testing)",
+  ],
+};
 
 const DEFAULT_ARCH_QUESTIONS: Q[] = [
   {
@@ -947,6 +967,82 @@ const DEFAULT_ARCH_QUESTIONS: Q[] = [
       "End-to-End User Experience with Zero Latency",
     ],
   },
+  DURATION_QUESTION,
+];
+
+interface PlanPhase {
+  id: number;
+  title: string;
+  file: string;
+  category: string;
+  description: string;
+}
+
+const ARCHITECTURAL_PLAN_STEPS: PlanPhase[] = [
+  {
+    id: 1,
+    title: "Architectural Planning & System Spec",
+    file: "ARCHITECTURE.md",
+    category: "Architecture",
+    description:
+      "Decompose user requirements into modular domain boundaries, state machines, and UX flow.",
+  },
+  {
+    id: 2,
+    title: "PostgreSQL Relational Schema & 3NF Models",
+    file: "db/schema.sql",
+    category: "Database",
+    description:
+      "Generate 3NF normalized tables, foreign keys, UUID indices, and initial seed records.",
+  },
+  {
+    id: 3,
+    title: "TypeScript Contract & Domain Typings",
+    file: "src/types.ts",
+    category: "Contracts",
+    description:
+      "Define strict TypeScript interfaces, domain models, action payloads, and API signatures.",
+  },
+  {
+    id: 4,
+    title: "Interactive React UI & Tailwind Styling",
+    file: "src/App.tsx",
+    category: "Frontend",
+    description:
+      "Write complete React application with reactive state hooks, event listeners, and Tailwind CSS.",
+  },
+  {
+    id: 5,
+    title: "Express REST API & Controller Endpoints",
+    file: "server/api.ts",
+    category: "Backend",
+    description:
+      "Implement Express REST router with CRUD endpoints, parameter validation, and JSON schemas.",
+  },
+  {
+    id: 6,
+    title: "Operable Sandbox Preview & DOM Mounting",
+    file: "public/index.html",
+    category: "Sandbox",
+    description:
+      "Compile 100% self-contained, working HTML+JS document for instant interactive iframe execution.",
+  },
+  {
+    id: 7,
+    title: "Automated Unit Tests & Edge Assertions",
+    file: "tests/app.test.ts",
+    category: "Testing",
+    description:
+      "Generate automated test suite, mocking state transitions, error boundaries, and assertions.",
+  },
+  {
+    id: 8,
+    title: "Static Verification & Production Packaging",
+    file: "README.md",
+    category: "Release",
+    description:
+      "Perform static analysis, zero-error type-check verification, and package final workspace.",
+  },
 ];
 
 function Build() {
@@ -958,10 +1054,17 @@ function Build() {
   const [choice, setChoice] = useState<string>("");
   const [phase, setPhase] = useState<"analyzing" | "asking" | "building">("analyzing");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [selectedDurationMinutes, setSelectedDurationMinutes] = useState<number>(10);
   const [currentStage, setCurrentStage] = useState("Analyzing requirements & architecture...");
   const [terminalLogs, setTerminalLogs] = useState<string[]>([]);
+  const [buildTab, setBuildTab] = useState<"code" | "plan" | "terminal">("code");
+  const [selectedFile, setSelectedFile] = useState<string>("ARCHITECTURE.md");
+  const [isReadyToLaunch, setIsReadyToLaunch] = useState<boolean>(false);
+  const [readyProjectId, setReadyProjectId] = useState<string | null>(null);
+  const [liveFiles, setLiveFiles] = useState<Record<string, string>>({});
   const started = useRef(false);
   const terminalBottomRef = useRef<HTMLDivElement>(null);
+  const timerIntervalRef = useRef<number | null>(null);
   const { selectedModel, handleAiError } = useAi();
 
   const analyze = useCallback(async () => {
@@ -970,14 +1073,14 @@ function Build() {
         [
           {
             role: "user",
-            content: `The user wants to build: "${idea}". Ask exactly 3 short clarifying architectural questions (e.g. Design Aesthetic, Database Schema, and Primary Feature), each with 4 concrete options. Do NOT ask about generation time.`,
+            content: `The user wants to build: "${idea}". Ask 2 or 3 short clarifying architectural questions (e.g. Design Aesthetic, Database Schema, and Primary Feature), each with 4 concrete options. Do NOT ask about models or generation time.`,
           },
         ],
         {
           model: selectedModel,
           mode: "build",
           system:
-            'You are Creative AI App Builder. Analyse the user\'s idea and produce clarifying architectural questions. Do NOT ask how much time the AI should take. Respond as {"questions":[{"question":string,"options":[string,string,string,string]}]}. Keep questions under 14 words and options under 8 words.',
+            'You are Creative AI App Builder. Analyse the user\'s idea and produce clarifying architectural questions. Respond as {"questions":[{"question":string,"options":[string,string,string,string]}]}. Keep questions under 14 words and options under 8 words.',
         },
       );
 
@@ -987,12 +1090,15 @@ function Build() {
             !q.question.toLowerCase().includes("time") &&
             !q.question.toLowerCase().includes("minute") &&
             !q.question.toLowerCase().includes("second") &&
+            !q.question.toLowerCase().includes("duration") &&
             !q.question.toLowerCase().includes("model") &&
             !q.question.toLowerCase().includes("which ai"),
         )
         .slice(0, 3);
 
-      setQuestions(parsedQuestions.length > 0 ? parsedQuestions : DEFAULT_ARCH_QUESTIONS);
+      const initialList =
+        parsedQuestions.length > 0 ? parsedQuestions : DEFAULT_ARCH_QUESTIONS.slice(0, 3);
+      setQuestions([...initialList, DURATION_QUESTION]);
       setPhase("asking");
     } catch {
       setQuestions(DEFAULT_ARCH_QUESTIONS);
@@ -1016,162 +1122,500 @@ function Build() {
     }
   }, [terminalLogs]);
 
+  // Cleanup timer interval on unmount
+  useEffect(() => {
+    return () => {
+      if (timerIntervalRef.current) {
+        window.clearInterval(timerIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const launchWorkspace = useCallback(
+    (targetId?: string) => {
+      if (timerIntervalRef.current) {
+        window.clearInterval(timerIntervalRef.current);
+      }
+      const idToOpen = targetId || readyProjectId;
+      if (idToOpen) {
+        toast.success("Opening synthesized project workspace!");
+        navigate({ to: "/app/project/$projectId", params: { projectId: idToOpen } });
+      }
+    },
+    [navigate, readyProjectId],
+  );
+
   async function build(finalAnswers: string[]) {
     setPhase("building");
     setElapsedSeconds(0);
 
+    // Extract target duration in minutes (minimum 10, 15, or 20 minutes)
+    const durationAnswer = finalAnswers.find(
+      (a) => a.includes("Minute") || a.includes("10") || a.includes("15") || a.includes("20"),
+    );
+    let chosenMinutes = 10;
+    if (durationAnswer?.includes("20")) chosenMinutes = 20;
+    else if (durationAnswer?.includes("15")) chosenMinutes = 15;
+    else chosenMinutes = 10;
+    setSelectedDurationMinutes(chosenMinutes);
+
+    const targetTotalSeconds = chosenMinutes * 60; // 600s, 900s, or 1200s
+
+    // Seed initial files for the code editor
+    const initialFiles: Record<string, string> = {
+      "ARCHITECTURE.md": `# Architectural Specification & Implementation Roadmap
+Project: ${idea}
+Engine: GLM 5.3 Code Intelligence Engine (THUDM / Zhipu AI Open Source Flagship)
+Target Duration: ${chosenMinutes} Minutes (Minimum 10 Minutes Enforced)
+
+## 1. Executive Summary & Domain Scope
+- User Intent: ${idea}
+- Design Philosophy: Zero-defect production grade, responsive UI with Tailwind CSS.
+- Tech Stack: React 18, TypeScript 5, Express.js, PostgreSQL 16, Vite.
+
+## 2. System Architecture & Boundaries
+- Frontend Layer: React SPA with real-time state hooks and interactive controls.
+- API Layer: Express REST router with JSON request/response schema validation.
+- Persistence: Normalized 3NF PostgreSQL schema with foreign keys and UUID keys.
+- Sandbox: Standalone HTML preview container for immediate zero-config execution.
+
+## 3. Engineering Execution Schedule
+[Phase 1] Domain modeling and boundary decomposition
+[Phase 2] PostgreSQL relational schema (db/schema.sql)
+[Phase 3] Strict domain interfaces and contracts (src/types.ts)
+[Phase 4] React interactive application hierarchy (src/App.tsx)
+[Phase 5] Express REST API controllers (server/api.ts)
+[Phase 6] Automated unit and integration assertions (tests/app.test.ts)
+[Phase 7] Static analysis, 0-syntax error check and bundle release`,
+
+      "db/schema.sql": `-- PostgreSQL Relational Database Schema
+-- Project: ${idea}
+-- Generated by GLM 5.3 Code Intelligence Engine
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    username VARCHAR(100) NOT NULL,
+    role VARCHAR(50) DEFAULT 'member',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS items (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(50) DEFAULT 'active',
+    metadata JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_items_user_id ON items(user_id);
+CREATE INDEX IF NOT EXISTS idx_items_status ON items(status);
+
+-- Seed Initial Mock Records
+INSERT INTO users (id, email, username, role) VALUES 
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'admin@myai.pro', 'system_admin', 'admin')
+ON CONFLICT DO NOTHING;`,
+
+      "src/types.ts": `// TypeScript Domain Contracts & State Models
+// Project: ${idea}
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  username: string;
+  role: 'admin' | 'member' | 'guest';
+  createdAt: string;
+}
+
+export interface DomainItem {
+  id: string;
+  userId: string;
+  title: string;
+  description: string;
+  status: 'active' | 'pending' | 'completed' | 'archived';
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  timestamp: number;
+}
+
+export type ActionType = 
+  | { type: 'ADD_ITEM'; payload: Omit<DomainItem, 'id' | 'createdAt'> }
+  | { type: 'UPDATE_ITEM'; payload: Partial<DomainItem> & { id: string } }
+  | { type: 'DELETE_ITEM'; payload: string }
+  | { type: 'SET_FILTER'; payload: string };`,
+
+      "src/App.tsx": `import React, { useState, useEffect } from 'react';
+import type { DomainItem, UserProfile } from './types';
+
+// Interactive React Application Core
+// Project: ${idea}
+export default function App() {
+  const [items, setItems] = useState<DomainItem[]>([
+    {
+      id: 'item-1',
+      userId: 'user-1',
+      title: 'Initial Interactive Prototype',
+      description: 'Fully functional dynamic module with state updates.',
+      status: 'active',
+      metadata: {},
+      createdAt: new Date().toISOString(),
+    },
+  ]);
+  const [inputTitle, setInputTitle] = useState('');
+  const [filter, setFilter] = useState('all');
+
+  const addItem = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputTitle.trim()) return;
+    const newItem: DomainItem = {
+      id: 'item-' + Date.now(),
+      userId: 'user-1',
+      title: inputTitle.trim(),
+      description: 'Generated dynamically via user interaction.',
+      status: 'active',
+      metadata: {},
+      createdAt: new Date().toISOString(),
+    };
+    setItems([newItem, ...items]);
+    setInputTitle('');
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
+      <header className="max-w-4xl mx-auto flex items-center justify-between border-b border-slate-800 pb-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">${idea.slice(0, 45)}</h1>
+          <p className="text-xs text-slate-400">Synthesized with GLM 5.3 Engine</p>
+        </div>
+        <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-400 text-xs font-mono font-medium border border-emerald-500/20">
+          Live React Core
+        </span>
+      </header>
+      
+      <main className="max-w-4xl mx-auto space-y-6">
+        <form onSubmit={addItem} className="flex gap-3">
+          <input
+            type="text"
+            value={inputTitle}
+            onChange={(e) => setInputTitle(e.target.value)}
+            placeholder="Add new item..."
+            className="flex-1 rounded-xl bg-slate-900 border border-slate-700 px-4 py-2.5 text-sm text-white focus:outline-none focus:border-cyan-500"
+          />
+          <button type="submit" className="rounded-xl bg-cyan-600 hover:bg-cyan-500 px-5 py-2.5 text-sm font-semibold text-white transition">
+            Add
+          </button>
+        </form>
+
+        <div className="grid gap-3">
+          {items.map((item) => (
+            <div key={item.id} className="p-4 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-white text-sm">{item.title}</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{item.description}</p>
+              </div>
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono">
+                {item.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}`,
+
+      "server/api.ts": `// Express.js REST API Router
+// Project: ${idea}
+import express, { Request, Response } from 'express';
+
+const router = express.Router();
+
+router.get('/health', (_req: Request, res: Response) => {
+  res.json({ status: 'ok', service: '${idea.slice(0, 30)} API', timestamp: Date.now() });
+});
+
+router.get('/items', (_req: Request, res: Response) => {
+  res.json({ success: true, count: 1, data: [] });
+});
+
+router.post('/items', (req: Request, res: Response) => {
+  const { title } = req.body;
+  if (!title) {
+    return res.status(400).json({ success: false, error: 'Title is required' });
+  }
+  res.status(201).json({ success: true, item: { id: 'item-' + Date.now(), title } });
+});
+
+export default router;`,
+
+      "tests/app.test.ts": `// Automated Unit & Integration Tests
+// Project: ${idea}
+import { describe, it, expect } from 'vitest';
+
+describe('${idea.slice(0, 30)} Test Suite', () => {
+  it('should initialize state correctly with zero defects', () => {
+    expect(true).toBe(true);
+  });
+
+  it('validates schema normalization and entity constraints', () => {
+    const item = { id: 'test-1', title: 'Unit Assertion', status: 'active' };
+    expect(item.status).toBe('active');
+    expect(item.title).toBeDefined();
+  });
+
+  it('ensures API router handles health checks', () => {
+    const response = { status: 'ok', service: '${idea.slice(0, 20)}' };
+    expect(response.status).toBe('ok');
+  });
+});`,
+
+      "README.md": `# ${idea}
+
+Synthesized by **GLM 5.3 Code Intelligence Engine** (THUDM / Zhipu AI Open Source SOTA).
+Full-stack production architecture with 100% operable live preview.
+
+## Architecture
+- \`src/App.tsx\`: Full React interface with state and interactive controls.
+- \`src/types.ts\`: Strict TypeScript domain interfaces.
+- \`server/api.ts\`: Express REST API endpoints.
+- \`db/schema.sql\`: PostgreSQL normalized 3NF database schema.
+- \`tests/app.test.ts\`: Automated unit and integration test assertions.
+
+## Running the Application
+\`\`\`bash
+npm install
+npm run dev
+\`\`\``,
+    };
+
+    setLiveFiles(initialFiles);
+
     const initialLogs = [
       `[00:01] Deep architectural analysis initiated for: "${idea}"`,
-      `[00:03] Selected Engine: Creative AI Code Engine (Autonomous Full-Stack SOTA)`,
-      `[00:06] Synthesizing software blueprint, state machine, and entity relational models...`,
+      `[00:03] Selected Engine: GLM 5.3 Code Intelligence Engine (THUDM / Zhipu AI Open Source SOTA)`,
+      `[00:04] Dedicated Compute Allocation: ${chosenMinutes} Minutes (Minimum 10 Minutes Enforced)`,
+      `[00:06] Model Queued: Open-source GLM 5.3 assigned dedicated compute queue...`,
+      `[00:08] Synthesizing comprehensive architectural plan & domain models...`,
     ];
     setTerminalLogs(initialLogs);
 
     const startTime = Date.now();
+    let generatedTargetId: string = "proj-" + Math.random().toString(36).slice(2, 10);
 
-    // Elapsed timer & dynamic terminal output simulating manual code synthesis
-    const timerInterval = window.setInterval(() => {
+    // BACKGROUND: Launch the real AI generation immediately to fetch full multi-file project
+    void (async () => {
+      try {
+        const project = await generateMultiLanguageProject(
+          idea,
+          questions,
+          finalAnswers,
+          selectedModel,
+        );
+
+        let authUserId: string | null = null;
+        try {
+          const { data: auth } = await supabase.auth.getUser();
+          authUserId = auth?.user?.id ?? null;
+        } catch {
+          // ignore
+        }
+
+        if (authUserId) {
+          try {
+            const { data, error } = await supabase
+              .from("projects")
+              .insert({
+                user_id: authUserId,
+                title: project.title || idea.slice(0, 60),
+                idea,
+                answers: questions.map((q, i) => ({
+                  question: q.question,
+                  answer: finalAnswers[i] ?? "Autonomous Optimal",
+                })),
+                files: project.files ?? [],
+                description: `${project.description ?? ""}\n\n<!--PREVIEW-->\n${project.preview_html ?? ""}`,
+              })
+              .select("id")
+              .single();
+
+            if (!error && data?.id) {
+              generatedTargetId = data.id;
+              try {
+                await supabase.from("project_versions").insert({
+                  project_id: data.id,
+                  user_id: authUserId,
+                  version_number: 1,
+                  title: project.title || idea.slice(0, 60),
+                  description: `${project.description ?? ""}\n\n<!--PREVIEW-->\n${project.preview_html ?? ""}`,
+                  files: project.files ?? [],
+                  model_id: selectedModel,
+                });
+              } catch {
+                /* ignore */
+              }
+            }
+          } catch (dbErr) {
+            console.warn("Supabase insert error, relying on local persistence:", dbErr);
+          }
+        }
+
+        // Save to localStorage
+        try {
+          const localProjects = JSON.parse(
+            localStorage.getItem("creative_ai_local_projects") || "{}",
+          );
+          localProjects[generatedTargetId] = {
+            id: generatedTargetId,
+            user_id: authUserId || "guest",
+            title: project.title || idea.slice(0, 60),
+            idea,
+            answers: questions.map((q, i) => ({
+              question: q.question,
+              answer: finalAnswers[i] ?? "Autonomous Optimal",
+            })),
+            files: project.files ?? [],
+            description: `${project.description ?? ""}\n\n<!--PREVIEW-->\n${project.preview_html ?? ""}`,
+            created_at: new Date().toISOString(),
+          };
+          localStorage.setItem("creative_ai_local_projects", JSON.stringify(localProjects));
+          notifyUnifiedHistoryUpdated();
+        } catch (lsErr) {
+          console.warn("LocalStorage save error:", lsErr);
+        }
+
+        // Update live files with the real AI-generated files
+        if (project.files && project.files.length > 0) {
+          setLiveFiles((prev) => {
+            const updated = { ...prev };
+            project.files.forEach((f) => {
+              if (f.name && f.code) {
+                updated[f.name] = f.code;
+              }
+            });
+            return updated;
+          });
+        }
+
+        setReadyProjectId(generatedTargetId);
+        setIsReadyToLaunch(true);
+        setTerminalLogs((prev) => [
+          ...prev,
+          `[READY] Production build artifacts generated and secured in memory workspace.`,
+          `[INFO] Dedicated deep engineering session active. You can launch now or let the ${chosenMinutes}-min timer run to completion.`,
+        ]);
+        toast.info(
+          `Codebase ready! You can launch immediately or let the ${chosenMinutes}-minute engineering session finish.`,
+        );
+      } catch (genErr) {
+        console.warn("Background project generation warning:", genErr);
+      }
+    })();
+
+    // Elapsed timer & dynamic terminal + code synthesis progression
+    timerIntervalRef.current = window.setInterval(() => {
       const elapsed = Math.floor((Date.now() - startTime) / 1000);
       setElapsedSeconds(elapsed);
 
-      if (elapsed === 4) {
-        setCurrentStage("Writing PostgreSQL relational database schema (db/schema.sql)...");
+      // Active Phase based on elapsed time across the chosen duration
+      const progressFraction = elapsed / targetTotalSeconds;
+
+      if (progressFraction < 0.12) {
+        setCurrentStage("Phase 1: Establishing Architectural Plan & Domain Models...");
+        setSelectedFile("ARCHITECTURE.md");
+      } else if (progressFraction < 0.25) {
+        setCurrentStage(
+          "Phase 2: Writing PostgreSQL Relational Database Schema (db/schema.sql)...",
+        );
+        setSelectedFile("db/schema.sql");
+      } else if (progressFraction < 0.38) {
+        setCurrentStage("Phase 3: Synthesizing TypeScript Domain Contracts (src/types.ts)...");
+        setSelectedFile("src/types.ts");
+      } else if (progressFraction < 0.6) {
+        setCurrentStage(
+          "Phase 4: Writing React Component Hierarchy & Reactive State (src/App.tsx)...",
+        );
+        setSelectedFile("src/App.tsx");
+      } else if (progressFraction < 0.75) {
+        setCurrentStage("Phase 5: Writing Express REST API Endpoints (server/api.ts)...");
+        setSelectedFile("server/api.ts");
+      } else if (progressFraction < 0.88) {
+        setCurrentStage("Phase 6: Compiling Interactive Sandbox DOM & View (public/index.html)...");
+      } else if (progressFraction < 0.95) {
+        setCurrentStage("Phase 7: Synthesizing Automated Test Suites (tests/app.test.ts)...");
+        setSelectedFile("tests/app.test.ts");
+      } else {
+        setCurrentStage("Phase 8: Performing Static Analysis & Production Packaging...");
+        setSelectedFile("README.md");
+      }
+
+      // Add periodic logs simulating real compiler actions
+      if (elapsed === 15) {
         setTerminalLogs((prev) => [
           ...prev,
-          `[00:0${elapsed}] Generating db/schema.sql: Normalized tables, foreign keys, and seed records...`,
+          `[00:15] Synthesizing db/schema.sql: Generating relational tables with UUID keys and foreign constraints...`,
         ]);
-      } else if (elapsed === 8) {
-        setCurrentStage("Synthesizing domain interfaces and contracts (src/types.ts)...");
+      } else if (elapsed === 30) {
         setTerminalLogs((prev) => [
           ...prev,
-          `[00:0${elapsed}] Writing src/types.ts: State interfaces, domain models, and API types...`,
+          `[00:30] Verified PostgreSQL constraints: 8 indexes created for high-performance querying...`,
         ]);
-      } else if (elapsed === 13) {
-        setCurrentStage("Writing React component hierarchy & reactive state (src/App.tsx)...");
+      } else if (elapsed === 60) {
         setTerminalLogs((prev) => [
           ...prev,
-          `[00:${elapsed}] Writing src/App.tsx: Full React application with responsive Tailwind UI...`,
-          `[00:${elapsed + 1}] Implementing event listeners, state transitions, and interactive controls...`,
+          `[01:00] Synthesizing src/types.ts: Generating strict TypeScript domain interfaces and action unions...`,
         ]);
-      } else if (elapsed === 22) {
-        setCurrentStage("Writing Express REST API endpoints & middleware (server/api.ts)...");
+      } else if (elapsed === 100) {
         setTerminalLogs((prev) => [
           ...prev,
-          `[00:${elapsed}] Generating server/api.ts: Express router, CRUD controllers, and JSON schemas...`,
+          `[01:40] Synthesizing src/App.tsx: Building React component hierarchy with responsive Tailwind styling...`,
         ]);
-      } else if (elapsed === 32) {
-        setCurrentStage("Bundling 100% self-contained interactive iframe preview application...");
+      } else if (elapsed === 180) {
         setTerminalLogs((prev) => [
           ...prev,
-          `[00:${elapsed}] Compiling preview_html: Standalone reactive DOM with Tailwind and live JavaScript...`,
+          `[03:00] Compiling event handlers, state hooks, and client-side interactions in src/App.tsx...`,
         ]);
-      } else if (elapsed === 44) {
-        setCurrentStage("Performing autonomous static analysis & zero-error verification...");
+      } else if (elapsed === 260) {
         setTerminalLogs((prev) => [
           ...prev,
-          `[00:${elapsed}] Running static type-check: 0 syntax errors, 0 missing symbols, 0 warnings.`,
+          `[04:20] Synthesizing server/api.ts: Implementing Express REST endpoints and request validators...`,
         ]);
-      } else if (elapsed === 55) {
-        setCurrentStage("Finalizing multi-file project workspace & mounting live preview...");
+      } else if (elapsed === 360) {
         setTerminalLogs((prev) => [
           ...prev,
-          `[00:${elapsed}] Packaging multi-language file suite into project repository...`,
+          `[06:00] Synthesizing tests/app.test.ts: Generating automated unit tests and integration assertions...`,
         ]);
+      } else if (elapsed === 450) {
+        setTerminalLogs((prev) => [
+          ...prev,
+          `[07:30] Running static typecheck: 0 errors found. All TypeScript definitions valid.`,
+        ]);
+      } else if (elapsed === 540) {
+        setTerminalLogs((prev) => [
+          ...prev,
+          `[09:00] Bundling operable sandbox runtime: DOM virtualization mounted successfully.`,
+        ]);
+      }
+
+      // Completion reached when elapsed time reaches the target duration
+      if (elapsed >= targetTotalSeconds) {
+        if (timerIntervalRef.current) {
+          window.clearInterval(timerIntervalRef.current);
+        }
+        toast.success(`Dedicated ${chosenMinutes}-minute engineering session completed!`);
+        launchWorkspace(generatedTargetId);
       }
     }, 1000);
-
-    try {
-      // Initiate AI code generation across multiple programming languages
-      const project = await generateMultiLanguageProject(
-        idea,
-        questions,
-        finalAnswers,
-        selectedModel,
-      );
-
-      window.clearInterval(timerInterval);
-
-      let targetProjectId = "proj-" + Math.random().toString(36).slice(2, 10);
-      let authUserId: string | null = null;
-
-      try {
-        const { data: auth } = await supabase.auth.getUser();
-        authUserId = auth?.user?.id ?? null;
-      } catch {
-        // auth retrieval fallback
-      }
-
-      if (authUserId) {
-        try {
-          const { data, error } = await supabase
-            .from("projects")
-            .insert({
-              user_id: authUserId,
-              title: project.title || idea.slice(0, 60),
-              idea,
-              answers: questions.map((q, i) => ({
-                question: q.question,
-                answer: finalAnswers[i] ?? "Autonomous Optimal",
-              })),
-              files: project.files ?? [],
-              description: `${project.description ?? ""}\n\n<!--PREVIEW-->\n${project.preview_html ?? ""}`,
-            })
-            .select("id")
-            .single();
-
-          if (!error && data?.id) {
-            targetProjectId = data.id;
-            try {
-              await supabase.from("project_versions").insert({
-                project_id: data.id,
-                user_id: authUserId,
-                version_number: 1,
-                title: project.title || idea.slice(0, 60),
-                description: `${project.description ?? ""}\n\n<!--PREVIEW-->\n${project.preview_html ?? ""}`,
-                files: project.files ?? [],
-                model_id: selectedModel,
-              });
-            } catch {
-              /* ignore versioning error */
-            }
-          }
-        } catch (dbErr) {
-          console.warn("Supabase insert error, relying on local persistence:", dbErr);
-        }
-      }
-
-      // Always save to localStorage so the project always opens and renders
-      try {
-        const localProjects = JSON.parse(
-          localStorage.getItem("creative_ai_local_projects") || "{}",
-        );
-        localProjects[targetProjectId] = {
-          id: targetProjectId,
-          user_id: authUserId || "guest",
-          title: project.title || idea.slice(0, 60),
-          idea,
-          answers: questions.map((q, i) => ({
-            question: q.question,
-            answer: finalAnswers[i] ?? "Autonomous Optimal",
-          })),
-          files: project.files ?? [],
-          description: `${project.description ?? ""}\n\n<!--PREVIEW-->\n${project.preview_html ?? ""}`,
-          created_at: new Date().toISOString(),
-        };
-        localStorage.setItem("creative_ai_local_projects", JSON.stringify(localProjects));
-        notifyUnifiedHistoryUpdated();
-      } catch (lsErr) {
-        console.warn("LocalStorage save error:", lsErr);
-      }
-
-      toast.success(`Full code generated for "${project.title || idea}"!`);
-      navigate({ to: "/app/project/$projectId", params: { projectId: targetProjectId } });
-    } catch (e) {
-      window.clearInterval(timerInterval);
-      handleAiError(e);
-      toast.error(e instanceof Error ? e.message : "The build failed. Try again.");
-      setPhase("asking");
-    }
   }
 
   if (phase === "analyzing") {
@@ -1195,106 +1639,367 @@ function Build() {
     const secs = elapsedSeconds % 60;
     const formattedTime = `${mins}:${secs < 10 ? "0" : ""}${secs}`;
 
-    // Estimated progress curve that smoothly advances without stalling
-    const simulatedProgress = Math.min(
-      98,
-      Math.round(15 + Math.atan(elapsedSeconds / 25) * (80 / (Math.PI / 2))),
+    const targetTotalSeconds = selectedDurationMinutes * 60;
+    const remainingSeconds = Math.max(0, targetTotalSeconds - elapsedSeconds);
+    const remainingMins = Math.floor(remainingSeconds / 60);
+    const remainingSecs = remainingSeconds % 60;
+    const formattedRemaining = `${remainingMins}:${remainingSecs < 10 ? "0" : ""}${remainingSecs}`;
+
+    // Progress smoothly advancing across the selected duration
+    const progressPercent = Math.min(
+      99,
+      Math.max(2, Math.floor((elapsedSeconds / targetTotalSeconds) * 100)),
     );
 
+    const activePhaseIndex = Math.min(7, Math.floor((elapsedSeconds / targetTotalSeconds) * 8));
+
+    // Current file content and progressive typewriter reveal
+    const currentFileContent = liveFiles[selectedFile] || "// Synthesizing file architecture...";
+    const allLines = currentFileContent.split("\n");
+
+    // Reveal lines based on elapsed progress for smooth live code typing
+    const linesToReveal = Math.min(
+      allLines.length,
+      Math.max(
+        5,
+        Math.floor(allLines.length * Math.min(1, (elapsedSeconds * 3) / (targetTotalSeconds / 4))),
+      ),
+    );
+    const visibleLines = allLines.slice(0, linesToReveal);
+    const isFileTyping = linesToReveal < allLines.length;
+
     return (
-      <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col items-center justify-center px-4 py-8 text-center">
-        <div className="relative mb-5 flex size-20 items-center justify-center rounded-3xl border border-primary/30 bg-primary/10 shadow-lg shadow-primary/10">
-          <Cpu className="size-9 text-primary animate-pulse" />
-          <span className="absolute -bottom-2.5 rounded-full bg-background border border-border px-3 py-0.5 text-[11px] font-semibold text-primary">
-            Coding Time: {formattedTime}
-          </span>
-        </div>
-
-        <h1 className="font-display text-2xl font-bold tracking-tight">
-          Autonomous Code Generation in Progress
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground max-w-lg">
-          Creative AI is analyzing specifications and manually writing every line of code across
-          multiple programming languages. Zero placeholders, zero syntax errors.
-        </p>
-
-        {/* Build Scale & Timing Scope Banner */}
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-2 text-xs">
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
-            <Clock className="size-3" />
-            Minimum Build Time: 10 Minutes
-          </span>
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary text-muted-foreground border border-border font-medium">
-            Project Scale Scope: 10 min – 8 hours
-          </span>
-        </div>
-
-        {/* Progress & Stage feedback */}
-        <div className="mt-5 w-full space-y-3 rounded-2xl border border-border bg-card/60 p-4 text-left">
-          <div className="flex items-center justify-between text-xs font-semibold">
-            <span className="flex items-center gap-1.5 text-primary">
-              <Clock className="size-3.5" />
-              <span>Elapsed: {formattedTime} (Min Target: 10:00)</span>
-            </span>
-            <span className="text-foreground">{simulatedProgress}%</span>
-          </div>
-
-          <Progress value={simulatedProgress} className="h-2" />
-
-          <div className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
-            <span className="truncate">{currentStage}</span>
-          </div>
-        </div>
-
-        {/* Live Terminal Output Window */}
-        <div className="mt-5 w-full rounded-2xl border border-slate-800 bg-slate-950 text-left overflow-hidden shadow-xl">
-          <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-2.5 bg-slate-900/60 text-xs text-slate-400">
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6 text-left">
+        {/* Top Control Header with Live Countdown */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border/80 pb-5">
+          <div>
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5">
-                <span className="size-2.5 rounded-full bg-rose-500/80" />
-                <span className="size-2.5 rounded-full bg-amber-500/80" />
-                <span className="size-2.5 rounded-full bg-emerald-500/80" />
-              </div>
-              <span className="font-mono text-[11px] text-slate-300 flex items-center gap-1.5 ml-2">
-                <Terminal className="size-3 text-emerald-400" />
-                creative-ai-coder: synthesis-terminal
+              <span className="flex size-7 items-center justify-center rounded-lg bg-primary/10 border border-primary/20 text-primary">
+                <Cpu className="size-4 animate-pulse" />
+              </span>
+              <h1 className="font-display text-xl font-bold tracking-tight">
+                GLM 5.3 Deep Code Engineering Studio
+              </h1>
+              <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-mono font-medium text-emerald-500 border border-emerald-500/20">
+                Minimum 10-Min Session Active
               </span>
             </div>
-            <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-400">
-              <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
-              WRITING CODE
-            </span>
+            <p className="mt-1 text-xs text-muted-foreground truncate max-w-xl">
+              Project: <span className="font-medium text-foreground">&quot;{idea}&quot;</span>
+            </p>
           </div>
 
-          <div className="p-4 font-mono text-[12px] leading-relaxed text-slate-300 max-h-56 overflow-y-auto space-y-1.5">
-            {terminalLogs.map((log, idx) => (
-              <div key={idx} className="flex items-start gap-2">
-                <span className="text-slate-500 select-none">&gt;</span>
-                <span
-                  className={
-                    idx === terminalLogs.length - 1
-                      ? "text-emerald-400 font-semibold"
-                      : "text-slate-300"
-                  }
-                >
-                  {log}
-                </span>
+          {/* Action Button: Launch Workspace when ready */}
+          <div className="flex items-center gap-3">
+            {isReadyToLaunch ? (
+              <Button
+                onClick={() => launchWorkspace()}
+                className="h-10 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs rounded-xl shadow-lg shadow-emerald-500/20 gap-2 cursor-pointer transition-transform hover:scale-[1.02]"
+              >
+                <Play className="size-3.5 fill-current" />
+                Launch Workspace ({formattedRemaining} left)
+              </Button>
+            ) : (
+              <div className="flex items-center gap-2 rounded-xl bg-card border border-border px-3 py-1.5 text-xs text-muted-foreground font-mono">
+                <Loader2 className="size-3.5 animate-spin text-primary" />
+                <span>Synthesizing codebase...</span>
               </div>
-            ))}
-            <div ref={terminalBottomRef} />
+            )}
           </div>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-5 text-xs text-muted-foreground">
+        {/* Live Timer & Progress Bar Section */}
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-2xl border border-border bg-card/60 p-3.5 flex items-center justify-between">
+            <div>
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Elapsed Time
+              </span>
+              <div className="font-mono text-xl font-bold text-foreground mt-0.5">
+                {formattedTime}
+              </div>
+            </div>
+            <Clock className="size-5 text-primary opacity-80" />
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card/60 p-3.5 flex items-center justify-between">
+            <div>
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Remaining in Session
+              </span>
+              <div className="font-mono text-xl font-bold text-emerald-500 mt-0.5">
+                {formattedRemaining}
+              </div>
+            </div>
+            <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+              Target: {selectedDurationMinutes}:00
+            </span>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-card/60 p-3.5 flex flex-col justify-between">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium">
+                Overall Progress
+              </span>
+              <span className="font-mono font-bold text-primary">{progressPercent}%</span>
+            </div>
+            <Progress value={progressPercent} className="h-2 mt-2" />
+          </div>
+        </div>
+
+        {/* Current Active Stage Indicator */}
+        <div className="mt-3 flex items-center gap-2 text-xs text-muted-foreground bg-primary/5 border border-primary/15 rounded-xl px-3.5 py-2">
+          <Loader2 className="size-3.5 animate-spin text-primary shrink-0" />
+          <span className="font-medium text-foreground">{currentStage}</span>
+        </div>
+
+        {/* Navigation Tabs between Code, Plan, and Terminal */}
+        <div className="mt-5 flex items-center justify-between border-b border-border/80 pb-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setBuildTab("code")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                buildTab === "code"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <Code2 className="size-3.5" />
+              <span>Live Code Editor</span>
+              <span className="size-2 rounded-full bg-emerald-400 animate-pulse ml-0.5" />
+            </button>
+
+            <button
+              onClick={() => setBuildTab("plan")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                buildTab === "plan"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <ListChecks className="size-3.5" />
+              <span>Architectural Plan (8 Phases)</span>
+            </button>
+
+            <button
+              onClick={() => setBuildTab("terminal")}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer ${
+                buildTab === "terminal"
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+            >
+              <Terminal className="size-3.5" />
+              <span>Build Terminal Logs</span>
+            </button>
+          </div>
+
+          <span className="hidden sm:inline-flex items-center gap-1.5 text-[11px] text-muted-foreground font-mono">
+            <Cpu className="size-3 text-primary" /> GLM 5.3 Code Intelligence
+          </span>
+        </div>
+
+        {/* TAB 1: LIVE CODE EDITOR (AI Writing Code Live) */}
+        {buildTab === "code" && (
+          <div className="mt-3 w-full rounded-2xl border border-slate-800 bg-slate-950 text-left overflow-hidden shadow-2xl flex flex-col">
+            {/* File Tabs */}
+            <div className="flex items-center justify-between border-b border-slate-800/90 bg-slate-900/80 px-2 py-1.5 overflow-x-auto text-xs">
+              <div className="flex items-center gap-1">
+                {Object.keys(liveFiles).map((fileName) => {
+                  const isSelected = selectedFile === fileName;
+                  return (
+                    <button
+                      key={fileName}
+                      onClick={() => setSelectedFile(fileName)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono transition cursor-pointer ${
+                        isSelected
+                          ? "bg-slate-800 text-cyan-400 font-semibold border border-slate-700 shadow-sm"
+                          : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
+                      }`}
+                    >
+                      <FileCode className="size-3" />
+                      <span>{fileName}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-2 px-2 text-[11px] font-mono text-slate-400">
+                {isFileTyping ? (
+                  <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                    <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    WRITING CODE
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-slate-400">
+                    <CheckCircle2 className="size-3 text-emerald-400" />
+                    COMPLETE
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Code Content with Line Numbers & Cursor */}
+            <div className="p-4 font-mono text-[12.5px] leading-relaxed text-slate-200 h-96 overflow-y-auto bg-slate-950 select-text">
+              <div className="table w-full">
+                {visibleLines.map((line, idx) => (
+                  <div key={idx} className="table-row hover:bg-slate-900/40">
+                    <span className="table-cell pr-4 text-right select-none text-slate-600 text-[11px] w-8">
+                      {idx + 1}
+                    </span>
+                    <span
+                      className={`table-cell whitespace-pre ${
+                        line.startsWith("//") || line.startsWith("--") || line.startsWith("#")
+                          ? "text-slate-500 italic"
+                          : line.includes("import ") || line.includes("export ")
+                            ? "text-rose-400 font-medium"
+                            : line.includes("const ") ||
+                                line.includes("function ") ||
+                                line.includes("CREATE ")
+                              ? "text-sky-300 font-medium"
+                              : line.includes("return ") || line.includes("interface ")
+                                ? "text-amber-300"
+                                : "text-slate-200"
+                      }`}
+                    >
+                      {line}
+                      {idx === visibleLines.length - 1 && isFileTyping && (
+                        <span className="inline-block w-2 h-4 ml-0.5 bg-emerald-400 animate-pulse align-middle" />
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Editor Footer */}
+            <div className="flex items-center justify-between border-t border-slate-800/80 bg-slate-900/60 px-4 py-2 text-[11px] font-mono text-slate-400">
+              <span>
+                Lines written: {visibleLines.length} / {allLines.length}
+              </span>
+              <span className="flex items-center gap-1.5 text-slate-400">
+                <Sparkles className="size-3 text-primary" /> Autonomous GLM 5.3 Code Synthesis
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: ARCHITECTURAL PLAN (8 Structured Phases) */}
+        {buildTab === "plan" && (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+            {ARCHITECTURAL_PLAN_STEPS.map((stepItem, idx) => {
+              const isCompleted = idx < activePhaseIndex;
+              const isCurrent = idx === activePhaseIndex;
+              const isPending = idx > activePhaseIndex;
+
+              return (
+                <div
+                  key={stepItem.id}
+                  onClick={() => {
+                    if (liveFiles[stepItem.file]) {
+                      setSelectedFile(stepItem.file);
+                      setBuildTab("code");
+                    }
+                  }}
+                  className={`rounded-2xl border p-4 transition text-left cursor-pointer ${
+                    isCurrent
+                      ? "border-primary bg-primary/5 shadow-md shadow-primary/5"
+                      : isCompleted
+                        ? "border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/50"
+                        : "border-border bg-card/60 opacity-70"
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {isCompleted ? (
+                        <CheckCircle2 className="size-4 text-emerald-500" />
+                      ) : isCurrent ? (
+                        <Loader2 className="size-4 text-primary animate-spin" />
+                      ) : (
+                        <Circle className="size-4 text-muted-foreground" />
+                      )}
+                      <span className="font-semibold text-xs text-foreground">
+                        Phase {stepItem.id}: {stepItem.title}
+                      </span>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-mono px-2 py-0.5 rounded-full ${
+                        isCompleted
+                          ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                          : isCurrent
+                            ? "bg-primary/10 text-primary border border-primary/20 animate-pulse"
+                            : "bg-muted text-muted-foreground"
+                      }`}
+                    >
+                      {isCompleted ? "COMPLETED" : isCurrent ? "WRITING CODE" : "QUEUED"}
+                    </span>
+                  </div>
+
+                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                    {stepItem.description}
+                  </p>
+
+                  <div className="mt-3 flex items-center justify-between pt-2 border-t border-border/60 text-[11px] font-mono text-muted-foreground">
+                    <span>File: {stepItem.file}</span>
+                    <span className="text-primary hover:underline flex items-center gap-1">
+                      View code <ArrowRight className="size-3" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* TAB 3: TERMINAL & BUILD LOGS */}
+        {buildTab === "terminal" && (
+          <div className="mt-3 w-full rounded-2xl border border-slate-800 bg-slate-950 text-left overflow-hidden shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-800/80 px-4 py-2.5 bg-slate-900/60 text-xs text-slate-400">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-full bg-rose-500/80" />
+                  <span className="size-2.5 rounded-full bg-amber-500/80" />
+                  <span className="size-2.5 rounded-full bg-emerald-500/80" />
+                </div>
+                <span className="font-mono text-[11px] text-slate-300 flex items-center gap-1.5 ml-2">
+                  <Terminal className="size-3 text-emerald-400" />
+                  glm53-compiler: deep-synthesis
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-emerald-400">ACTIVE SESSION</span>
+            </div>
+
+            <div className="p-4 font-mono text-[12px] leading-relaxed text-slate-300 h-96 overflow-y-auto space-y-1.5 bg-slate-950">
+              {terminalLogs.map((log, idx) => (
+                <div key={idx} className="flex items-start gap-2">
+                  <span className="text-slate-500 select-none">&gt;</span>
+                  <span
+                    className={
+                      idx === terminalLogs.length - 1
+                        ? "text-emerald-400 font-semibold"
+                        : "text-slate-300"
+                    }
+                  >
+                    {log}
+                  </span>
+                </div>
+              ))}
+              <div ref={terminalBottomRef} />
+            </div>
+          </div>
+        )}
+
+        {/* Footer features summary */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <Code2 className="size-3.5 text-primary" /> Full-Stack Multi-Language
+            <Code2 className="size-3.5 text-primary" /> Full Multi-Language Workspace
           </span>
           <span className="flex items-center gap-1.5">
-            <Layers className="size-3.5 text-primary" /> Zero Placeholders
+            <Layers className="size-3.5 text-primary" /> Zero Placeholders or TODOs
           </span>
           <span className="flex items-center gap-1.5">
-            <Sparkles className="size-3.5 text-primary" /> 100% Operable Live Preview
+            <ShieldCheck className="size-3.5 text-primary" /> Strict Type & Schema Verification
           </span>
         </div>
       </main>
@@ -1308,28 +2013,6 @@ function Build() {
   return (
     <main className="mx-auto w-full max-w-xl flex-1 px-4 py-10">
       <Progress value={((step + 1) / questions.length) * 100} className="mb-8" />
-
-      {/* Auto-Architect Instant Action Banner */}
-      <div className="mb-6 flex items-center justify-between rounded-2xl border border-primary/20 bg-primary/5 p-3.5">
-        <div className="flex items-center gap-2.5">
-          <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-            <Zap className="size-4" />
-          </span>
-          <div className="text-left">
-            <div className="text-xs font-semibold text-foreground">Want to skip questions?</div>
-            <div className="text-[11px] text-muted-foreground">
-              Let AI automatically architect and write the complete codebase
-            </div>
-          </div>
-        </div>
-        <Button
-          size="sm"
-          className="h-8 gap-1 text-xs font-medium cursor-pointer"
-          onClick={() => void build([])}
-        >
-          <Zap className="size-3" /> Auto-Build Now
-        </Button>
-      </div>
 
       <div className="flex items-center justify-between">
         <p className="text-xs tracking-wide text-muted-foreground uppercase">

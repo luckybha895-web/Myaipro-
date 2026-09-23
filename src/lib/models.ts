@@ -1,10 +1,34 @@
 export const BUILD_MODELS = [
   {
+    id: "glm-5.3-coder",
+    label: "GLM 5.3 Coder (THUDM / Zhipu AI Open Source SOTA)",
+    tag: "GLM 5.3 SOTA",
+    description:
+      "Integrated open-source GLM 5.3 code intelligence engine. SOTA algorithmic reasoning, deep multi-turn planning, polyglot full-stack scaffolding, 128k context, and zero-defect code synthesis.",
+    available: true,
+  },
+  {
+    id: "mtplx-coder-mtp",
+    label: "MTPLX Coder (Native MTP Speculative Decoding)",
+    tag: "youssofal/MTPLX SOTA",
+    description:
+      "Native Multi-Token Prediction (MTP) speculative decoding code intelligence engine (github.com/youssofal/MTPLX). Drafts and verifies multiple code tokens ahead for rapid full-stack application building and code joining.",
+    available: true,
+  },
+  {
+    id: "qwen-2.1-image",
+    label: "Qwen 2.1 Image (QwenLM SOTA Visual Engine)",
+    tag: "Qwen Visual SOTA",
+    description:
+      "Advanced multimodal image generation and multi-image editing model from QwenLM. Supports multi-image fusion, image-to-image commands, style transfers, and 4K visual synthesis.",
+    available: true,
+  },
+  {
     id: "my-ai-pro-1-1",
     label: "My AI Pro 1.1 (Flagship Multimodal SOTA)",
     tag: "My AI Pro Official SOTA",
     description:
-      "Flagship multimodal intelligence architecture built by Bhavyash Redd. Ultra-fast conversational reasoning, live multi-engine search grounding, 4K visual synthesis, and full-stack autonomous execution.",
+      "Flagship multimodal intelligence architecture. Ultra-fast conversational reasoning, live multi-engine search grounding, 4K visual synthesis, and full-stack autonomous execution.",
     available: true,
   },
   {

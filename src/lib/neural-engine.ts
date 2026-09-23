@@ -1758,7 +1758,7 @@ function handleGeneralSynthesis(
     qLower.includes("person to build you")
   ) {
     return {
-      text: `I was created and built by **Bhavyash Redd**. I am **Creative AI**, an intelligent AI platform powered by real-time web search, multimodal vision analysis, high-fidelity image generation & editing, presentation maker, voice assistant, and full-stack application building.`,
+      text: `I am **My AI Pro** (powered by the **My AI Pro 1.1** neural architecture), an intelligent AI platform powered by real-time web search, multimodal vision analysis, high-fidelity image generation & editing, presentation maker, voice assistant, and full-stack application building.`,
       sources: [],
       grounded: false,
     };

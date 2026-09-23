@@ -22,6 +22,7 @@ import {
   ArrowRight,
   Loader2,
   Lock,
+  ExternalLink,
 } from "lucide-react";
 import {
   type SubscriptionPlan,
@@ -29,6 +30,7 @@ import {
   activateSubscriptionPlan,
   formatINR,
 } from "@/lib/subscription";
+import { startStripeCheckout } from "@/lib/stripe";
 import { toast } from "sonner";
 
 interface Props {
@@ -36,6 +38,7 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   selectedPlan: SubscriptionPlan | null;
   userId?: string | null;
+  userEmail?: string | null;
   onSuccess?: () => void;
 }
 
@@ -44,12 +47,13 @@ export function PaymentModal({
   onOpenChange,
   selectedPlan,
   userId,
+  userEmail,
   onSuccess,
 }: Props) {
   const [activePlan, setActivePlan] = useState<SubscriptionPlan>(
-    selectedPlan || SUBSCRIPTION_PLANS[2] // Default to ₹299 Developer Pro
+    selectedPlan || SUBSCRIPTION_PLANS[2], // Default to ₹299 Developer Pro
   );
-  const [method, setMethod] = useState<"upi" | "card" | "netbanking">("upi");
+  const [method, setMethod] = useState<"stripe" | "upi" | "card" | "netbanking">("stripe");
   const [upiId, setUpiId] = useState("user@okhdfcbank");
   const [upiApp, setUpiApp] = useState<"gpay" | "phonepe" | "paytm" | "bhim">("gpay");
   const [cardNumber, setCardNumber] = useState("4532 •••• •••• 8912");
@@ -57,6 +61,7 @@ export function PaymentModal({
   const [cardCvv, setCardCvv] = useState("•••");
   const [cardName, setCardName] = useState("My AI Pro Subscriber");
   const [selectedBank, setSelectedBank] = useState("HDFC Bank");
+  const [isStripeLoading, setIsStripeLoading] = useState(false);
 
   const [processingState, setProcessingState] = useState<
     "idle" | "authorizing" | "capturing" | "success"
@@ -73,10 +78,33 @@ export function PaymentModal({
   useEffect(() => {
     if (open) {
       setProcessingState("idle");
+      setIsStripeLoading(false);
     }
   }, [open]);
 
+  const handlePayWithStripe = async () => {
+    setIsStripeLoading(true);
+    try {
+      toast.info(
+        `Redirecting to Stripe Checkout for ${activePlan.name} (${formatINR(activePlan.priceINR)})...`,
+      );
+      await startStripeCheckout(
+        activePlan.id === "free" ? "starter" : activePlan.id,
+        userId,
+        userEmail,
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to open Stripe Checkout");
+      setIsStripeLoading(false);
+    }
+  };
+
   const handlePay = () => {
+    if (method === "stripe") {
+      void handlePayWithStripe();
+      return;
+    }
+
     setProcessingState("authorizing");
 
     setTimeout(() => {
@@ -84,12 +112,18 @@ export function PaymentModal({
 
       setTimeout(() => {
         const upiOrDetail =
-          method === "upi" ? `${upiApp.toUpperCase()}: ${upiId}` : method === "card" ? `Card ${cardNumber.slice(-4)}` : selectedBank;
-        
+          method === "upi"
+            ? `${upiApp.toUpperCase()}: ${upiId}`
+            : method === "card"
+              ? `Card ${cardNumber.slice(-4)}`
+              : selectedBank;
+
         const res = activateSubscriptionPlan(activePlan.id, method, upiOrDetail, userId);
         setInvoiceId(res.invoice.invoiceNumber);
         setProcessingState("success");
-        toast.success(`Payment Successful! Activated ${activePlan.name} with ${activePlan.tokensFormatted}`);
+        toast.success(
+          `Payment Successful! Activated ${activePlan.name} with ${activePlan.tokensFormatted}`,
+        );
         onSuccess?.();
       }, 1500);
     }, 1500);
@@ -118,7 +152,9 @@ export function PaymentModal({
                 Payment Completed!
               </h2>
               <p className="text-sm text-muted-foreground">
-                Your subscription to <span className="font-semibold text-foreground">{activePlan.name}</span> is now active.
+                Your subscription to{" "}
+                <span className="font-semibold text-foreground">{activePlan.name}</span> is now
+                active.
               </p>
             </div>
 
@@ -129,7 +165,9 @@ export function PaymentModal({
                   <Receipt className="size-4 text-primary" />
                   <span className="text-xs font-bold text-foreground">Tax Invoice (India)</span>
                 </div>
-                <span className="text-xs font-mono text-muted-foreground">{invoiceId || "INV-INR-89214"}</span>
+                <span className="text-xs font-mono text-muted-foreground">
+                  {invoiceId || "INV-INR-89214"}
+                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3 text-xs">
@@ -143,7 +181,9 @@ export function PaymentModal({
                 </div>
                 <div>
                   <p className="text-muted-foreground text-[11px]">Amount Paid</p>
-                  <p className="font-bold text-foreground text-sm">{formatINR(activePlan.priceINR)} (INR)</p>
+                  <p className="font-bold text-foreground text-sm">
+                    {formatINR(activePlan.priceINR)} (INR)
+                  </p>
                 </div>
                 <div>
                   <p className="text-muted-foreground text-[11px]">Payment Method</p>
@@ -153,7 +193,9 @@ export function PaymentModal({
 
               <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-2.5 text-[11px] text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
                 <ShieldCheck className="size-4 shrink-0" />
-                <span>GST Registered: 27AABCM8921Z1ZP · 100% Secure Transaction via NPCI / RBI Gateway</span>
+                <span>
+                  GST Registered: 27AABCM8921Z1ZP · 100% Secure Transaction via NPCI / RBI Gateway
+                </span>
               </div>
             </div>
 
@@ -188,7 +230,8 @@ export function PaymentModal({
               </h3>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
                 Please do not close or refresh this tab. Your payment of{" "}
-                <span className="font-bold text-foreground">{formatINR(activePlan.priceINR)}</span> is being securely processed.
+                <span className="font-bold text-foreground">{formatINR(activePlan.priceINR)}</span>{" "}
+                is being securely processed.
               </p>
             </div>
             <div className="w-full bg-muted rounded-full h-2 overflow-hidden max-w-xs mx-auto">
@@ -215,7 +258,9 @@ export function PaymentModal({
                   </span>
                 </div>
                 <DialogDescription className="text-xs text-muted-foreground text-left mt-1">
-                  Instant activation with <span className="font-semibold text-primary">{activePlan.tokensFormatted}</span>, unlimited code generation, and priority compute.
+                  Instant activation with{" "}
+                  <span className="font-semibold text-primary">{activePlan.tokensFormatted}</span>,
+                  unlimited code generation, and priority compute.
                 </DialogDescription>
               </DialogHeader>
 
@@ -240,7 +285,9 @@ export function PaymentModal({
                         </span>
                       )}
                     </div>
-                    <p className="text-xs font-extrabold text-primary mt-0.5">{formatINR(p.priceINR)}</p>
+                    <p className="text-xs font-extrabold text-primary mt-0.5">
+                      {formatINR(p.priceINR)}
+                    </p>
                   </button>
                 ))}
               </div>
@@ -255,47 +302,109 @@ export function PaymentModal({
                 </span>
               </div>
 
-              {/* Tabs for UPI, Card, NetBanking */}
-              <div className="grid grid-cols-3 gap-2">
+              {/* Tabs for Stripe, UPI, Card, NetBanking */}
+              <div className="grid grid-cols-4 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMethod("stripe")}
+                  className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer relative ${
+                    method === "stripe"
+                      ? "bg-primary/10 border-primary text-primary font-bold shadow-xs ring-1 ring-primary/40"
+                      : "border-border/60 hover:bg-muted/40 text-muted-foreground"
+                  }`}
+                >
+                  <span className="absolute -top-2 right-1.5 px-1.5 py-0.2 rounded-full bg-indigo-600 text-white text-[9px] font-extrabold uppercase">
+                    Stripe
+                  </span>
+                  <ShieldCheck className="size-4.5 mb-1 text-indigo-500" />
+                  <span className="text-xs">Stripe Pay</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setMethod("upi")}
-                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
                     method === "upi"
                       ? "bg-primary/10 border-primary text-primary font-bold shadow-xs"
                       : "border-border/60 hover:bg-muted/40 text-muted-foreground"
                   }`}
                 >
-                  <QrCode className="size-5 mb-1" />
+                  <QrCode className="size-4.5 mb-1" />
                   <span className="text-xs">UPI / QR</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setMethod("card")}
-                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
                     method === "card"
                       ? "bg-primary/10 border-primary text-primary font-bold shadow-xs"
                       : "border-border/60 hover:bg-muted/40 text-muted-foreground"
                   }`}
                 >
-                  <CreditCard className="size-5 mb-1" />
-                  <span className="text-xs">Debit / Credit</span>
+                  <CreditCard className="size-4.5 mb-1" />
+                  <span className="text-xs">Card</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setMethod("netbanking")}
-                  className={`flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all cursor-pointer ${
+                  className={`flex flex-col items-center justify-center p-2 rounded-xl border transition-all cursor-pointer ${
                     method === "netbanking"
                       ? "bg-primary/10 border-primary text-primary font-bold shadow-xs"
                       : "border-border/60 hover:bg-muted/40 text-muted-foreground"
                   }`}
                 >
-                  <Building2 className="size-5 mb-1" />
-                  <span className="text-xs">Net Banking</span>
+                  <Building2 className="size-4.5 mb-1" />
+                  <span className="text-xs">NetBank</span>
                 </button>
               </div>
+
+              {/* Method Forms */}
+              {method === "stripe" && (
+                <div className="space-y-3 rounded-xl border border-indigo-500/30 bg-indigo-500/[0.04] p-4 text-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="size-6 rounded-md bg-indigo-600 flex items-center justify-center text-white font-bold text-[11px]">
+                        S
+                      </div>
+                      <span className="font-bold text-foreground">
+                        Stripe Hosted Checkout (INR)
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      RBI Compliant
+                    </span>
+                  </div>
+
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    Subscribe securely to{" "}
+                    <strong className="text-foreground">{activePlan.name}</strong> (
+                    {formatINR(activePlan.priceINR)}/month). Supports Credit/Debit Cards (Visa,
+                    Mastercard, RuPay, Amex), Apple Pay, Google Pay, and NetBanking with automated
+                    tax invoicing.
+                  </p>
+
+                  <div className="rounded-lg bg-card border border-border p-3 space-y-1.5 font-mono text-[11px]">
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Monthly Recurring:</span>
+                      <span className="font-bold text-foreground">
+                        {formatINR(activePlan.priceINR)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Tokens Credited:</span>
+                      <span className="font-bold text-primary">{activePlan.tokensFormatted}</span>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Cancellation:</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-sans font-medium">
+                        Anytime with 1-click
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Method Forms */}
               {method === "upi" && (
@@ -309,15 +418,15 @@ export function PaymentModal({
 
                   <div className="grid grid-cols-4 gap-1.5">
                     {[
-                      { id: "gpay", name: "Google Pay", label: "GPay" },
-                      { id: "phonepe", name: "PhonePe", label: "PhonePe" },
-                      { id: "paytm", name: "Paytm", label: "Paytm" },
-                      { id: "bhim", name: "BHIM UPI", label: "BHIM" },
+                      { id: "gpay" as const, name: "Google Pay", label: "GPay" },
+                      { id: "phonepe" as const, name: "PhonePe", label: "PhonePe" },
+                      { id: "paytm" as const, name: "Paytm", label: "Paytm" },
+                      { id: "bhim" as const, name: "BHIM UPI", label: "BHIM" },
                     ].map((app) => (
                       <button
                         key={app.id}
                         type="button"
-                        onClick={() => setUpiApp(app.id as any)}
+                        onClick={() => setUpiApp(app.id)}
                         className={`rounded-lg py-1.5 px-2 text-center text-xs font-semibold border transition-all cursor-pointer ${
                           upiApp === app.id
                             ? "bg-primary text-primary-foreground border-primary shadow-xs"
@@ -449,9 +558,27 @@ export function PaymentModal({
                 </div>
                 <Button
                   onClick={handlePay}
-                  className="brand-bg text-primary-foreground font-bold px-6 h-10 shadow-md cursor-pointer text-xs"
+                  disabled={isStripeLoading}
+                  className={`font-bold px-6 h-10 shadow-md cursor-pointer text-xs ${
+                    method === "stripe"
+                      ? "bg-indigo-600 hover:bg-indigo-700 text-white"
+                      : "brand-bg text-primary-foreground"
+                  }`}
                 >
-                  <Zap className="size-3.5 mr-1.5" /> Pay {formatINR(activePlan.priceINR)} Now
+                  {isStripeLoading ? (
+                    <>
+                      <Loader2 className="size-3.5 mr-1.5 animate-spin" /> Connecting to Stripe...
+                    </>
+                  ) : method === "stripe" ? (
+                    <>
+                      <ShieldCheck className="size-3.5 mr-1.5" /> Subscribe with Stripe (
+                      {formatINR(activePlan.priceINR)})
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="size-3.5 mr-1.5" /> Pay {formatINR(activePlan.priceINR)} Now
+                    </>
+                  )}
                 </Button>
               </div>
             </div>

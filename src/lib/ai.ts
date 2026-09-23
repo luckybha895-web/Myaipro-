@@ -1,4 +1,4 @@
-import { consumeTokens, getSubscription } from "./subscription";
+import { consumeTokens } from "./subscription";
 
 export type AiMessage = {
   role: "system" | "user" | "assistant";
@@ -51,14 +51,6 @@ export async function askAI(
     apiKey?: string | undefined;
   } = {},
 ): Promise<AiResult> {
-  // Check subscription token allowance
-  const currentSub = getSubscription();
-  if (currentSub.tokensUsed >= currentSub.tokensLimit) {
-    throw new AiServiceError(
-      "You have reached your subscription token limit. Please upgrade your plan in Indian Rupees (₹199, ₹299, or ₹599) to continue.",
-    );
-  }
-
   const res = await fetch("/api/ai", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

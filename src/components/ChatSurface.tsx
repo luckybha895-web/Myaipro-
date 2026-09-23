@@ -37,6 +37,8 @@ import { Button } from "@/components/ui/button";
 import { Composer, type Attachment } from "@/components/Composer";
 import { askAI, fileBlock, editImageAI, generateImageAI, type AiMessage } from "@/lib/ai";
 import { ImagePreview } from "@/components/ImagePreview";
+import { SourceCitations, stripRawLinksFromText } from "@/components/SourceCitations";
+import { ImageGenerationSketching } from "@/components/ImageGenerationSketching";
 import { useAi } from "@/components/AiProvider";
 import { BUILD_MODELS } from "@/lib/models";
 import {
@@ -351,6 +353,7 @@ export function ChatSurface({
   const [imageTransformPrompt, setImageTransformPrompt] = useState<string>("");
   const [transformingImage, setTransformingImage] = useState<boolean>(false);
   const [lightboxImageUrl, setLightboxImageUrl] = useState<string | null>(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState<boolean>(false);
 
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
@@ -587,17 +590,30 @@ Ensure the paper contains:
     setBusy(true);
     try {
       const lastUserMsg = history[history.length - 1];
-      const hasImageAttachment = atts.some((a) => a.mime.startsWith("image/"));
+      const hasImageAttachment =
+        atts.some((a) => a.mime.startsWith("image/") || a.dataUrl?.startsWith("data:image/")) ||
+        history.some((m) => m.imageUrl || (m.imageUrls && m.imageUrls.length > 0));
+      const imageAttCount =
+        atts.filter((a) => a.mime.startsWith("image/") || a.dataUrl?.startsWith("data:image/"))
+          .length +
+        (lastUserMsg?.imageUrls ? lastUserMsg.imageUrls.length : lastUserMsg?.imageUrl ? 1 : 0);
+      const isMultiImage = imageAttCount > 1;
+
       const isImgPrompt =
         wantImage ||
         (hasImageAttachment &&
-          /\b(edit|modify|filter|redraw|change|colorize|transform|convert|enhance|style|tune|photoshop|cartoon|anime|sketch|vintage|cyberpunk|portrait|painting|render|add|remove|replace|make it|make this|turn this|recreate)\b/i.test(
-            lastUserMsg?.content || "",
-          )) ||
+          (isMultiImage ||
+            /\b(edit|modify|filter|redraw|change|colorize|transform|convert|enhance|style|tune|photoshop|cartoon|anime|sketch|vintage|cyberpunk|portrait|painting|render|add|remove|replace|make it|make this|turn this|recreate|combine|merge|blend|mix|fuse|put|swap|composite|command)\b/i.test(
+              lastUserMsg?.content || "",
+            ))) ||
         (lastUserMsg &&
           /\b(generate|create|draw|paint|illustrat|render|make a picture|make an image|produce a visual|give me an image|show me an image|image of|picture of|photo of|give me a picture|show me a picture|wallpaper of|artwork of|sketch of|design a logo|generate logo|portrait of|landscape of|visualize)\b/i.test(
             lastUserMsg.content || "",
           ));
+
+      if (isImgPrompt) {
+        setIsGeneratingImage(true);
+      }
 
       const payload: AiMessage[] = history.map((m, i) => {
         const isLastUser = i === history.length - 1 && m.role === "user";
@@ -606,7 +622,7 @@ Ensure the paper contains:
             role: "user",
             content: [
               { type: "text", text: m.content || "Analyze or edit this content." },
-              ...atts.map((a) => fileBlock(a.name, a.mime, a.dataUrl)),
+              ...atts.map((a) => fileBlock(a.name, a.mime, a.dataUrl || a.data)),
             ],
           };
         }
@@ -614,7 +630,7 @@ Ensure the paper contains:
       });
 
       const memoryContext = getMemoryPromptContext(userId);
-      const effectiveSystem = `${system}\nActive Training Persona: ${persona}. If the user asks for code, act as a master Vibe Coder providing complete, functional, highly polished, zero-error code in markdown code blocks (\`\`\`language\\n...\\n\`\`\`). If asked for design or visual concepts, provide rich artistic descriptions.${memoryContext ? `\n\n${memoryContext}` : ""}`;
+      const effectiveSystem = `${system}\nActive Training Persona: ${persona}. You are My AI Pro, trained for crystal-clear clarity, authoritative answers, and next-level software engineering. Always structure answers cleanly with bold highlights, concise points, and zero fluff. If asked for code, write complete, production-grade, bug-free code manually line-by-line in markdown blocks without placeholders or '// TODO'. Do not output raw link URLs in text; sources are rendered natively in the UI.${memoryContext ? `\n\n${memoryContext}` : ""}`;
 
       const res = await askAI(payload, {
         system: effectiveSystem,
@@ -704,6 +720,7 @@ Ensure the paper contains:
       toast.error(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
       setBusy(false);
+      setIsGeneratingImage(false);
     }
   }
 
@@ -788,19 +805,39 @@ Ensure the paper contains:
     if (!content && attachments.length === 0) return;
 
     // Detect explicit image generation or editing intent
-    const hasImageAttachment = attachments.some((a) => a.mime.startsWith("image/"));
+    const imageAtts = attachments.filter(
+      (a) =>
+        a.mime.startsWith("image/") ||
+        a.data?.startsWith("data:image/") ||
+        a.dataUrl?.startsWith("data:image/"),
+    );
+    const hasImageAttachment = imageAtts.length > 0;
+    const isMultiImageUpload = imageAtts.length > 1;
+
     const isExplicitGen =
       /\b(generate|create|draw|paint|illustrat|render|make a picture|make an image|produce a visual|give me an image|show me an image|image of|picture of|photo of|give me a picture|show me a picture|wallpaper of|artwork of|sketch of|design a logo|generate logo|portrait of|landscape of|visualize)\b/i.test(
         content,
       );
     const isExplicitEdit =
       hasImageAttachment &&
-      /\b(edit|modify|filter|redraw|change this image|change this picture|colorize|transform this image|convert this image|enhance this image)\b/i.test(
-        content,
-      );
+      (isMultiImageUpload ||
+        /\b(edit|modify|filter|redraw|change|colorize|transform|convert|enhance|style|tune|photoshop|cartoon|anime|sketch|vintage|cyberpunk|portrait|painting|render|add|remove|replace|make it|make this|turn this|recreate|combine|merge|blend|mix|fuse|put|swap|composite|command)\b/i.test(
+          content,
+        ));
     const wantImage = allowImages && (isExplicitGen || isExplicitEdit);
 
-    const userMsg: ChatMsg = { id: uid(), role: "user", content };
+    const userImageUrls = imageAtts
+      .map((a) => a.data || a.dataUrl || a.url)
+      .filter(Boolean) as string[];
+    const userImageUrl = userImageUrls[0] || null;
+
+    const userMsg: ChatMsg = {
+      id: uid(),
+      role: "user",
+      content,
+      imageUrl: userImageUrl,
+      imageUrls: userImageUrls.length > 0 ? userImageUrls : undefined,
+    };
     const next: ChatMsg[] = [...messages, userMsg];
 
     // Compute smart title if this is the first message in this session
@@ -982,27 +1019,76 @@ Ensure the paper contains:
                     : "glow-panel max-w-full rounded-3xl rounded-bl-md px-4 py-3 text-sm leading-relaxed"
                 }
               >
-                {/* Render content with separate copyable code blocks */}
-                {m.role === "assistant" ? renderFormattedMessage(m.content) : m.content}
-
-                {m.imageUrl && (
-                  <div className="mt-3.5 max-w-2xl">
-                    <ImagePreview
-                      src={m.imageUrl}
-                      title={m.content ? m.content.slice(0, 60) : "MyAI Pro Creation"}
-                      subtitle="MyAI Pro Visual Studio"
-                      badgeText="MyAI Pro"
-                      onEdit={(url, title) =>
-                        setEditingImage({
-                          url: url || m.imageUrl || "",
-                          prompt: title || m.content || "MyAI Pro Artwork",
-                        })
-                      }
-                      onShare={(url, title) =>
-                        handleShareImage(url || m.imageUrl || "", title || m.content)
-                      }
-                    />
+                {/* User Message Rendering (Photo Card + Prompt) */}
+                {m.role === "user" ? (
+                  <div className="space-y-2.5">
+                    {m.imageUrls && m.imageUrls.length > 1 ? (
+                      <div className="grid grid-cols-2 gap-2 max-w-sm sm:max-w-md">
+                        {m.imageUrls.map((url, imgIdx) => (
+                          <div
+                            key={imgIdx}
+                            onClick={() => setLightboxImageUrl(url)}
+                            className="group relative aspect-square overflow-hidden rounded-xl border border-border/70 bg-black/20 shadow-xs cursor-pointer hover:opacity-95 transition-opacity"
+                            title={`Click to zoom image ${imgIdx + 1}`}
+                          >
+                            <img
+                              src={url}
+                              alt={`Attachment ${imgIdx + 1}`}
+                              className="h-full w-full object-cover rounded-xl"
+                            />
+                            <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-[10px] font-medium text-white bg-black/70 px-2 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                                <Maximize2 className="size-2.5" /> View
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : m.imageUrl ? (
+                      <div
+                        onClick={() => setLightboxImageUrl(m.imageUrl || null)}
+                        className="group relative max-w-sm sm:max-w-md overflow-hidden rounded-2xl border border-border/70 bg-black/20 shadow-md cursor-pointer hover:opacity-95 transition-opacity"
+                        title="Click to zoom image"
+                      >
+                        <img
+                          src={m.imageUrl}
+                          alt="Uploaded attachment"
+                          className="max-h-80 w-full object-cover rounded-2xl"
+                        />
+                        <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <span className="text-xs font-medium text-white bg-black/70 px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
+                            <Maximize2 className="size-3" /> View full image
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
+                    {m.content && <div>{m.content}</div>}
                   </div>
+                ) : (
+                  <>
+                    {/* Render content with separate copyable code blocks */}
+                    {renderFormattedMessage(stripRawLinksFromText(m.content))}
+
+                    {/* AI Generated Image Studio */}
+                    {m.imageUrl && (
+                      <div className="mt-3.5 max-w-2xl">
+                        <ImagePreview
+                          src={m.imageUrl}
+                          title={m.content ? m.content.slice(0, 60) : "My AI Pro Creation"}
+                          subtitle="My AI Pro Visual Studio"
+                          onEdit={(url, title) =>
+                            setEditingImage({
+                              url: url || m.imageUrl || "",
+                              prompt: title || m.content || "My AI Pro Artwork",
+                            })
+                          }
+                          onShare={(url, title) =>
+                            handleShareImage(url || m.imageUrl || "", title || m.content)
+                          }
+                        />
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* High-Resolution Google & Web Images Gallery (Only shown when not a single generated image) */}
@@ -1099,57 +1185,8 @@ Ensure the paper contains:
                   </div>
                 )}
 
-                {/* Subtly formatted consulted references */}
-                {m.sources && m.sources.length > 0 && (
-                  <div className="mt-3.5 border-t border-border/40 pt-2.5">
-                    <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">
-                      <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground">
-                        <Globe className="size-3.5 text-primary" />
-                        <span>Sources & References ({m.sources.length}):</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const validSources = m.sources?.filter((s) => s.url) || [];
-                          validSources.forEach((s) => {
-                            window.open(s.url, "_blank", "noopener,noreferrer");
-                          });
-                          toast.success(`Opening ${validSources.length} source links in new tabs`);
-                        }}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20 transition-all cursor-pointer shadow-xs active:scale-95"
-                        title="Click to open all source links where AI gathered information"
-                      >
-                        <ExternalLink className="size-3" />
-                        <span>Open All Sources</span>
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {m.sources.map((s, sIdx) => {
-                        let domain = "source";
-                        try {
-                          domain = new URL(s.url).hostname.replace(/^www\./, "");
-                        } catch {
-                          /* ignore */
-                        }
-                        return (
-                          <a
-                            key={sIdx}
-                            href={s.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-muted/40 hover:bg-muted/80 hover:border-primary/50 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-all shadow-xs"
-                          >
-                            <span className="font-medium">{domain}</span>
-                            {s.title && s.title !== domain && (
-                              <span className="truncate max-w-[170px] opacity-70">• {s.title}</span>
-                            )}
-                            <ExternalLink className="size-2.5 opacity-60 shrink-0" />
-                          </a>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                {/* Modern Sources & Citations matching Screenshot 2 */}
+                {m.sources && m.sources.length > 0 && <SourceCitations sources={m.sources} />}
 
                 {/* ON-DEMAND DOWNLOAD CARDS (Only shown if user explicitly asks for PDF or Spreadsheet) */}
                 {m.role === "assistant" && isPdfRequested && (
@@ -1342,13 +1379,17 @@ Ensure the paper contains:
           </div>
         )}
 
-        {/* Standard Thinking Spinner */}
-        {busy && !isResearching && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="size-4 animate-spin text-primary" />
-            <span>Thinking, researching live data & synthesizing answer…</span>
-          </div>
-        )}
+        {/* Thinking or Image Sketching Indicator matching Screenshot 1 */}
+        {busy &&
+          !isResearching &&
+          (isGeneratingImage ? (
+            <ImageGenerationSketching label="Sketching it out" />
+          ) : (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Loader2 className="size-4 animate-spin text-primary" />
+              <span>Thinking, researching live data & synthesizing answer…</span>
+            </div>
+          ))}
 
         <div ref={bottom} />
       </div>

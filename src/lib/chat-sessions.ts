@@ -18,6 +18,7 @@ export type ChatMsg = {
   role: "user" | "assistant";
   content: string;
   imageUrl?: string | null | undefined;
+  imageUrls?: string[] | undefined;
   images?: ChatMediaImage[] | undefined;
   videos?: ChatMediaVideo[] | undefined;
   sources?: Array<{ title: string; url: string }> | undefined;

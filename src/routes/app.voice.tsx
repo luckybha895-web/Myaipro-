@@ -66,6 +66,12 @@ import { askAI, type AiMessage } from "@/lib/ai";
 import { useAuth } from "@/hooks/useAuth";
 import { getMemoryPromptContext, recordConversationTurnToMemory } from "@/lib/user-memory";
 import { toast } from "sonner";
+import {
+  SourceCitations,
+  stripRawLinksFromText,
+  type GroundedSourceItem,
+} from "@/components/SourceCitations";
+import { ImageGenerationSketching } from "@/components/ImageGenerationSketching";
 
 export const Route = createFileRoute("/app/voice")({
   head: () => ({
@@ -91,9 +97,11 @@ type ConversationTurn = {
   timestamp: string;
   userText: string;
   assistantText: string;
+  userImageUrl?: string | null;
   imageUrl?: string | null;
   folderSummary?: string | null;
   attachmentName?: string | null;
+  sources?: GroundedSourceItem[];
 };
 
 // Isolated Code Block with Dedicated Copy & Download for Voice Assistant
@@ -297,6 +305,7 @@ function VoiceAssistant() {
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [isGeneratingImageVoice, setIsGeneratingImageVoice] = useState(false);
   const [muted, setMuted] = useState(false);
   const [transcript, setTranscript] = useState("");
   const [textInput, setTextInput] = useState("");
@@ -507,6 +516,10 @@ function VoiceAssistant() {
         /\b(generate|create|draw|paint|illustrat|render|make a picture|make an image|produce a visual|give me an image|show me an image|image of|picture of|photo of|give me a picture|show me a picture|wallpaper of|artwork of|sketch of|design a logo|generate logo|portrait of|landscape of|visualize|edit this image|edit image|change picture|filter image|modify image)\b/i.test(
           promptText,
         );
+
+      if (isImageRequest) {
+        setIsGeneratingImageVoice(true);
+      }
 
       // 1. Check if user explicitly commanded to open Photo Studio or Camera
       if (
@@ -823,8 +836,8 @@ function VoiceAssistant() {
       const memoryContext = getMemoryPromptContext(userId);
 
       const baseSystem = isCodingQuery
-        ? "You are Creative AI Voice Assistant, created and built by Bhavyash Redd, powered by high-performance code intelligence. When asked to code, generate clean, complete, modern, bug-free code inside standard markdown codeblocks (```lang ... ```). Never abbreviate or leave placeholders. When asked who built or created you, answer that you were built by Bhavyash Redd."
-        : "You are Creative AI Voice Assistant, created and built by Bhavyash Redd. Provide clear, direct, and complete answers to the user's questions without meta-announcements or 'live search results' prefixes. When asked who created or built you, state that you were built by Bhavyash Redd. When generating or editing images, describe the artistic composition concisely. Format all code in clean markdown codeblocks.";
+        ? "You are Creative AI Voice Assistant, powered by high-performance code intelligence. When asked to code, generate clean, complete, modern, bug-free code inside standard markdown codeblocks (```lang ... ```). Never abbreviate or leave placeholders."
+        : "You are Creative AI Voice Assistant. Provide clear, direct, and complete answers to the user's questions without meta-announcements or 'live search results' prefixes. When generating or editing images, describe the artistic composition concisely. Format all code in clean markdown codeblocks.";
 
       const fullSystemPrompt = `${baseSystem}${memoryContext ? `\n\n${memoryContext}` : ""}`;
 
@@ -874,13 +887,16 @@ function VoiceAssistant() {
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         userText: promptText,
         assistantText: replyText,
+        userImageUrl: attachedImage,
         imageUrl: finalImageUrl,
         attachmentName: attachedAttachmentName,
         folderSummary: uploadedFolderSummary,
+        sources: aiResponse.sources ?? [],
       };
 
       saveTurns([...turns, newTurn]);
       setIsThinking(false);
+      setIsGeneratingImageVoice(false);
 
       // Clear single-turn attachments after sending
       setAttachedImage(null);
@@ -900,6 +916,7 @@ function VoiceAssistant() {
       }
     } catch (e) {
       setIsThinking(false);
+      setIsGeneratingImageVoice(false);
       setIsSpeaking(false);
       setStatusText("Go ahead");
       handleAiError(e);
@@ -1191,6 +1208,24 @@ function VoiceAssistant() {
                   <span className="text-slate-500 font-normal">{turn.timestamp}</span>
                 </div>
                 <div className="space-y-2">
+                  {turn.userImageUrl && (
+                    <div
+                      onClick={() => setLightboxImageUrl(turn.userImageUrl || null)}
+                      className="group relative max-w-xs overflow-hidden rounded-2xl border border-slate-700/60 bg-black/30 shadow-md cursor-pointer hover:opacity-95 transition-opacity"
+                      title="Click to view full image"
+                    >
+                      <img
+                        src={turn.userImageUrl}
+                        alt="Uploaded photo"
+                        className="max-h-60 w-full object-cover rounded-2xl"
+                      />
+                      <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <span className="text-[11px] font-medium text-white bg-black/75 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow">
+                          <Maximize2 className="size-3" /> View full image
+                        </span>
+                      </div>
+                    </div>
+                  )}
                   <p className="text-xs font-medium text-slate-200 bg-[#191a26] p-2.5 rounded-xl border border-slate-700/50">
                     "{turn.userText}"
                   </p>
@@ -1300,20 +1335,28 @@ function VoiceAssistant() {
                 )}
 
                 <div className="rounded-xl bg-[#0d0e14] p-3 border border-slate-800/60">
-                  <FormattedMessageContent text={turn.assistantText} />
+                  <FormattedMessageContent text={stripRawLinksFromText(turn.assistantText)} />
+                  {turn.sources && turn.sources.length > 0 && (
+                    <SourceCitations sources={turn.sources} />
+                  )}
                 </div>
               </div>
             </div>
           ))
         )}
 
-        {/* Live Thinking / Transcribing Indicator */}
-        {isThinking && (
-          <div className="flex items-center gap-2 rounded-2xl bg-[#141520] p-3 border border-slate-800 text-xs text-sky-300">
-            <Loader2 className="size-4 animate-spin text-sky-400 shrink-0" />
-            <span>Voice Assistant is thinking and formulating response...</span>
-          </div>
-        )}
+        {/* Live Thinking / Sketching Indicator matching Screenshot 1 */}
+        {isThinking &&
+          (isGeneratingImageVoice ? (
+            <div className="rounded-2xl bg-[#141520] p-3 border border-slate-800">
+              <ImageGenerationSketching label="Sketching it out" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-2xl bg-[#141520] p-3 border border-slate-800 text-xs text-sky-300">
+              <Loader2 className="size-4 animate-spin text-sky-400 shrink-0" />
+              <span>Voice Assistant is thinking and formulating response...</span>
+            </div>
+          ))}
 
         <div ref={scrollEndRef} />
       </div>

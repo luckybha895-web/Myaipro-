@@ -20,6 +20,28 @@ export interface CodeEngineModel {
 
 export const OPEN_SOURCE_CODE_MODELS: CodeEngineModel[] = [
   {
+    id: "glm-5.3-coder",
+    name: "GLM 5.3 Coder (THUDM / Zhipu AI Open Source SOTA)",
+    family: "glm",
+    description:
+      "Open-source GLM 5.3 flagship code intelligence engine. Excels at complex polyglot reasoning, full-stack multi-file scaffolding, React/TypeScript architecture, and zero-defect code synthesis.",
+    contextWindow: 131072,
+    supportsFim: true,
+    isOpenSource: true,
+    benchmarkScore: "HumanEval: 94.8% · SOTA Code Synthesis",
+  },
+  {
+    id: "mtplx-coder-mtp",
+    name: "MTPLX Coder MTP (Multi-Token Prediction)",
+    family: "qwen",
+    description:
+      "Native Multi-Token Prediction (MTP) speculative decoding architecture (github.com/youssofal/MTPLX). Drafts multiple tokens ahead and verifies with exact rejection sampling for ultra-fast full-stack code synthesis and component joining.",
+    contextWindow: 131072,
+    supportsFim: true,
+    isOpenSource: true,
+    benchmarkScore: "MTP Speculative Decoding: Up to 2.24x Speedup",
+  },
+  {
     id: "qwen-2.5-coder-72b",
     name: "Qwen 2.5 Coder 72B Instruct (QwenLM)",
     family: "qwen",

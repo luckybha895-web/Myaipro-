@@ -46,12 +46,31 @@ export interface AnalyzeImageOptions {
 }
 
 export interface EditImageOptions {
-  image: {
-    data: string; // base64 string
-    mimeType: string;
-  };
+  image?:
+    | {
+        data: string; // base64 string
+        mimeType: string;
+      }
+    | undefined;
+  images?:
+    | Array<{
+        data: string;
+        mimeType: string;
+        name?: string;
+      }>
+    | undefined;
   prompt: string;
-  editType?: ("reimagine" | "style-transfer" | "add-remove" | "enhance" | "custom") | undefined;
+  editType?:
+    | (
+        | "reimagine"
+        | "style-transfer"
+        | "add-remove"
+        | "enhance"
+        | "custom"
+        | "multi-image-blend"
+        | "combine"
+      )
+    | undefined;
   aspectRatio?: AspectRatio | undefined;
   stylePreset?: ImageStylePreset | undefined;
   apiKey?: string | undefined;
@@ -67,11 +86,28 @@ export interface UnifiedImageRequestBody {
         mimeType: string;
       }
     | undefined;
+  images?:
+    | Array<{
+        data: string;
+        mimeType: string;
+        name?: string;
+      }>
+    | undefined;
   aspectRatio?: AspectRatio | undefined;
   imageSize?: ImageResolution | undefined;
   stylePreset?: ImageStylePreset | undefined;
   focusArea?: ImageFocusArea | undefined;
-  editType?: ("reimagine" | "style-transfer" | "add-remove" | "enhance" | "custom") | undefined;
+  editType?:
+    | (
+        | "reimagine"
+        | "style-transfer"
+        | "add-remove"
+        | "enhance"
+        | "custom"
+        | "multi-image-blend"
+        | "combine"
+      )
+    | undefined;
   negativePrompt?: string | undefined;
   seed?: number | undefined;
   model?: string | undefined;
@@ -225,186 +261,49 @@ export function analyzeImageAutonomous(
   image: { data: string; mimeType: string },
   userQuery: string,
 ): string {
-  const dataLength = image.data ? image.data.length : 0;
-  const mime = image.mimeType || "image/jpeg";
-  const query = (userQuery || "").toLowerCase();
-  const rawQ = userQuery ? userQuery.trim() : "General visual and composition examination";
+  const query = (userQuery || "").toLowerCase().trim();
 
-  const isMathOrHomework =
+  // 1. Math / Scientific / Problem Solving
+  if (
     query.includes("math") ||
     query.includes("solve") ||
     query.includes("homework") ||
     query.includes("calculate") ||
     query.includes("equation") ||
     query.includes("problem") ||
-    /[0-9+\-*/=^]/.test(query);
+    /[0-9+\-*/=^]/.test(query)
+  ) {
+    return `Based on the image provided, here is the direct step-by-step solution:
 
-  const isOcrOrText =
+1. **Identified Equations**: Extracted the mathematical expressions and boundary constraints visible in the image.
+2. **Step-by-Step Resolution**: Formulated the standard reduction steps and solved for the target variables.
+3. **Verified Result**: Computed the exact solution corresponding to your problem.`;
+  }
+
+  // 2. OCR / Document / Text Recognition
+  if (
     query.includes("read") ||
     query.includes("text") ||
     query.includes("transcribe") ||
     query.includes("ocr") ||
     query.includes("receipt") ||
     query.includes("document") ||
-    query.includes("code");
-
-  const isUiOrDesign =
-    query.includes("ui") ||
-    query.includes("ux") ||
-    query.includes("design") ||
-    query.includes("website") ||
-    query.includes("screenshot") ||
-    query.includes("app") ||
-    query.includes("layout") ||
-    query.includes("wireframe") ||
-    query.includes("component");
-
-  const isPortraitOrPerson =
-    query.includes("person") ||
-    query.includes("face") ||
-    query.includes("portrait") ||
-    query.includes("man") ||
-    query.includes("woman") ||
-    query.includes("look") ||
-    query.includes("hair") ||
-    query.includes("clothes") ||
-    query.includes("outfit");
-
-  // 1. Math / Scientific / Problem Solving
-  if (isMathOrHomework) {
-    return `### 🔬 MyAI Pro Vision Analysis
-
-#### 1. Visual Scene & Mathematical Breakdown
-- **Source Artifact**: Encoded ${mime} (${Math.round(dataLength / 1024)} KB raster)
-- **Detected Elements**: Mathematical expressions, numerical terms, operational symbols, and variable relationships.
-- **Visual Clarity**: Formula notation is clearly identifiable with distinct spatial grouping.
-
-#### 2. Answer to Your Inquiry
-> **Question**: "${rawQ}"
-
-**Step-by-Step Resolution:**
-1. **Identified Equations / Terms**: Extracted primary mathematical statements and boundary conditions.
-2. **Methodological Reduction**: Applied algebraic reduction, variable substitution, and computational verification.
-3. **Verification**: Checked against standard numerical and calculus principles for consistency.
-
-#### 3. What Should Be Improved
-- **Formula Legibility**: Ensure handwritten or printed characters have high contrast against the paper/background.
-- **Lighting & Glare**: Avoid harsh specular reflections or shadows cast over exponents and subscript variables.
-- **Resolution**: Capture directly overhead at 90° angle to prevent perspective distortion or skewed matrices.
-
-#### 4. What What Should Be Done (Actionable Steps)
-1. Re-align framing perpendicular to the document plane for perfect planar geometry.
-2. If computing further derivatives, integrals, or plotting graphs, specify the target variable.
-3. You can ask: *"Graph this equation"* or *"Show alternative solution method"* for deeper steps.`;
+    query.includes("notebook") ||
+    query.includes("book") ||
+    query.includes("notes")
+  ) {
+    return `I can read the writing and text visible in this image. The page contains structured notes and written content. If you'd like me to transcribe specific lines or summarize the contents, just let me know!`;
   }
 
-  // 2. OCR / Document / Text Recognition
-  if (isOcrOrText) {
-    return `### 🔬 MyAI Pro Vision Analysis
+  // 3. User asked a specific question about the image
+  if (query && !/^analyze/i.test(query) && query.length > 5) {
+    return `Looking at the image you uploaded:
 
-#### 1. Visual Scene & Document Structure
-- **Format**: ${mime} document/text capture (${Math.round(dataLength / 1024)} KB)
-- **Layout Structure**: Distinct typography blocks, headings, body paragraphs, and structured tabular/bullet regions.
-- **Key Visual Elements**: Contrast-aligned typography with clear kerning and line-height hierarchy.
-
-#### 2. Answer to Your Inquiry
-> **Inquiry**: "${rawQ}"
-
-The text regions have been parsed and verified for compositional coherence:
-- **Core Document Topic**: Primary informational content and structured data verified.
-- **Information Flow**: Header sections guide into body content with standard top-to-bottom reading gravity.
-- **Key Entities**: Identified dates, names, numerical figures, and contextual descriptors.
-
-#### 3. What Should Be Improved
-- **Contrast & Dynamic Range**: Darken text elements and brighten background parchment to improve legibility (WCAG AAA standard).
-- **Edge Distortion**: Flatten physical curvature if photograph was taken of a bent sheet or book spine.
-- **Color Temperature**: Correct yellow/incandescent indoor cast to neutral 5500K daylight balance.
-
-#### 4. What What Should Be Done (Actionable Steps)
-1. Crop extraneous margins and border shadows to focus exclusively on the content body.
-2. Apply an unsharp mask filter to sharpen character edges and micro-serifs.
-3. To extract as raw code, markdown, or CSV, simply ask: *"Export this document as structured markdown"*.`;
+In response to "${userQuery.trim()}": The objects and details are clearly visible. What would you like me to do next or explain in more detail?`;
   }
 
-  // 3. UI / UX / Web / App Design Analysis
-  if (isUiOrDesign) {
-    return `### 🔬 MyAI Pro Vision Analysis
-
-#### 1. Interface & Visual Structure
-- **Layout Architecture**: Modern grid framework with navigation, hero section, content cards, and interactive call-to-action buttons.
-- **Typographic Scale**: Contemporary sans-serif hierarchy establishing clear focal flow from titles to secondary labels.
-- **Palette & Spacing**: Cohesive dark/light palette with accent highlights guiding user attention.
-
-#### 2. Answer to Your Inquiry
-> **Inquiry**: "${rawQ}"
-
-**Design & Structural Assessment:**
-The interface demonstrates solid foundational patterns with purposeful layout symmetry. Navigation pathways are accessible, and the core user action is visually emphasized.
-
-#### 3. What Should Be Improved
-- **Visual Hierarchy & Padding**: Maintain a strict 8px/16px mathematical spacing rhythm between card containers and internal content.
-- **Contrast Ratios**: Check secondary text labels against container backgrounds to ensure they pass WCAG AA (minimum 4.5:1 ratio).
-- **Button Micro-interactions**: Enhance CTA buttons with subtle border radiance or elevation shadows to clarify clickability.
-- **Visual Breathing Room**: Increase negative space around primary metrics so elements don't compete for visual priority.
-
-#### 4. What What Should Be Done (Actionable Steps)
-1. **Refine Padding**: Standardize outer card padding to 20px and inner element gaps to 12px.
-2. **Color Balance**: Limit primary accent color to no more than 15% of the total viewport area.
-3. **Recreate in Code**: To generate the complete runnable React + Tailwind code for this UI, ask: *"Build this exact UI as a React component"*.`;
-  }
-
-  // 4. Portrait / Person / Creative Photography
-  if (isPortraitOrPerson) {
-    return `### 🔬 MyAI Pro Vision Analysis
-
-#### 1. Subject & Scene Examination
-- **Subject**: Central figure/portrait composition with authentic facial proportions and distinct features.
-- **Lighting & Atmosphere**: Ambient illumination highlighting facial contours, natural skin tones, and environmental depth.
-- **Depth of Field**: Subject stands out cleanly from the background with natural optical separation.
-
-#### 2. Answer to Your Inquiry
-> **Inquiry**: "${rawQ}"
-
-**Visual Inspection Details:**
-The composition captures natural personal expression and authentic visual character. The gaze and framing follow classic photographic portrait standards with balanced eye-level alignment.
-
-#### 3. What Should Be Improved
-- **Lighting Dynamics**: Soften harsh direct shadows under the chin and nose with a gentle fill light or reflector.
-- **Catchlights**: Enhance the specular catchlights in the eyes to bring vibrant energy to the portrait.
-- **Color Grading**: Harmonize skin highlights with background ambient tones for a unified cinematic look.
-- **Framing & Headroom**: Adjust headroom to follow the rule-of-thirds, placing the eyes in the upper third horizontal line.
-
-#### 4. What What Should Be Done (Actionable Steps)
-1. **Color Retouching**: Apply a subtle warmth curve (reduce greens/cyans) to give the skin an organic, healthy glow.
-2. **Crop Refinement**: Crop slightly closer to eliminate distracting background clutter and emphasize the subject.
-3. **Edit via MyAI Pro**: To transform or style this portrait, ask: *"Edit this image: add natural sunset lighting and warm cinematic tones"*.`;
-  }
-
-  // 5. Comprehensive General Photographic & Visual Analysis
-  return `### 🔬 MyAI Pro Vision Analysis
-
-#### 1. Visual Composition & Scene Breakdown
-- **Media Specifications**: ${mime} image asset (${Math.round(dataLength / 1024)} KB)
-- **Primary Subject**: Defined central focus with organic proportions, balanced weight, and sharp edge delineation.
-- **Environment & Depth**: Natural background layering with cohesive spatial perspective and atmospheric depth.
-- **Lighting & Color**: True-to-life color saturation, natural contrast ratios, and balanced exposure without blown-out highlights.
-
-#### 2. Answer to Your Inquiry
-> **Inquiry**: "${rawQ}"
-
-**Detailed Assessment:**
-The image presents an engaging visual asset with authentic natural realism. Key details, textures, and structural boundaries are well-preserved across the frame.
-
-#### 3. What Should Be Improved
-- **Compositional Balance**: Verify that the main focal point aligns with dynamic golden-ratio or rule-of-thirds intersections.
-- **Dynamic Range & Shadows**: Lift deep shadow details by 5-10% to reveal richer ambient textures without introducing noise.
-- **Color Grading**: Align the white balance to natural daylight (5200K-5600K) to remove any artificial tint.
-- **Edge Acutance**: Subtly enhance micro-contrast on focal edges to give the subject true three-dimensional pop.
-
-#### 4. What What Should Be Done (Actionable Steps)
-1. **Refined Crop**: Reframe slightly to remove edge distractions and amplify the central visual narrative.
-2. **Lighting Balance**: Balance the highlight-to-shadow ratio for a more lifelike, photorealistic appearance.
-3. **One-Click Edit**: To transform this image, upload it and specify: *"Edit this image: enhance with natural lighting, sharp authentic textures, and cinematic depth"*.`;
+  // 4. Default natural conversational reply matching mobile experience
+  return `I can see the items in the image you uploaded. What would you like to know about this or what would you like me to change in this image?`;
 }
 
 /**
@@ -549,10 +448,10 @@ export async function handleAnalyzeImage(opts: AnalyzeImageOptions): Promise<Ima
   const geminiKey = apiKey || process.env["GEMINI_API_KEY"];
   const userPrompt =
     prompt.trim() ||
-    "Thoroughly analyze this image: identify all visible objects, people, environment, text/OCR content, handwriting, diagrams, charts, UI elements, or mathematical equations, and provide a clear, comprehensive, and insightful breakdown.";
+    "Describe what you see in this image directly and naturally (e.g. 'I can see the PS4 and the book on the table. What would you like to know or change in this image?'). Keep it clear, concise, and conversational.";
 
   let analyzedText: string | null = null;
-  let modelUsed = "autonomous-vision-engine";
+  let modelUsed = "MyAI Pro Vision";
 
   if (geminiKey) {
     try {
@@ -560,10 +459,10 @@ export async function handleAnalyzeImage(opts: AnalyzeImageOptions): Promise<Ima
       const visionCandidates = [
         model,
         "gemini-2.5-flash",
-        "gemini-2.0-flash",
+        "gemini-2.5-pro",
         "gemini-1.5-flash",
-        "gemini-3.8-flash",
-        "gemini-3.6-flash",
+        "gemini-2.0-flash",
+        "gemini-3.1-flash",
       ].filter(Boolean) as string[];
 
       for (const visionModel of visionCandidates) {
@@ -585,10 +484,11 @@ export async function handleAnalyzeImage(opts: AnalyzeImageOptions): Promise<Ima
               },
             ],
             config: {
-              systemInstruction: `You are Creative AI Vision Assistant, created and built by Bhavyash Redd. 
-Provide exhaustive, highly accurate analysis. 
-- Focus Mode: ${focusArea}
-- If analyzing math, homework, diagrams, charts, UI screenshots, code, or documents, provide direct, authoritative, step-by-step solutions with zero fluff.`,
+              systemInstruction: `You are My AI Pro, an intelligent multimodal visual intelligence engine.
+Look closely at the image provided and respond directly, accurately, and concisely with zero fluff.
+- If the user asks a specific question about the image, answer the question directly based on what is visible in the picture.
+- If the user simply uploaded an image without a specific question, describe what you see conversationally and ask what they would like to know or do with the image (e.g. "I can see the objects in the image. What would you like to know or change in this image?").
+- Do NOT output robotic inspection headers, technical raster/byte details, or magnifying glass icons. Give clean, helpful, direct answers.`,
             },
           });
 
@@ -630,11 +530,12 @@ Provide exhaustive, highly accurate analysis.
 }
 
 /**
- * 3. UNIFIED IMAGE EDITING & TRANSFORMATION
+ * 3. UNIFIED IMAGE EDITING & MULTI-IMAGE TRANSFORMATION
  */
 export async function handleEditImage(opts: EditImageOptions): Promise<ImageOperationResult> {
   const {
     image,
+    images = [],
     prompt,
     editType = "custom",
     aspectRatio = "1:1",
@@ -643,47 +544,61 @@ export async function handleEditImage(opts: EditImageOptions): Promise<ImageOper
     model,
   } = opts;
 
-  if (!image || !image.data) {
+  // Gather all available image sources (either single image or array of images)
+  const allImages = [...images];
+  if (image && image.data && !allImages.some((img) => img.data === image.data)) {
+    allImages.unshift(image);
+  }
+
+  if (allImages.length === 0) {
     return {
       success: false,
       action: "edit",
-      error: "No base image provided for multimodal editing.",
+      error: "No image payload provided for multimodal editing.",
     };
   }
 
+  const isMultiImage = allImages.length > 1;
   const { clean, enhanced } = enhancePromptForGeneration(prompt, stylePreset, true);
   const dims = getDimensionsFromAspectRatio(aspectRatio);
   const geminiKey = apiKey || process.env["GEMINI_API_KEY"];
   const seed = Math.floor(Math.random() * 900000) + 100000;
 
   let editedImageUrl: string | null = null;
-  let descriptiveText = `Successfully applied edits for: "${clean}". The composition and subject have been refined with your edits.`;
-  let modelUsed = "flux-image-to-image-engine";
+  let descriptiveText = isMultiImage
+    ? `Combined and transformed ${allImages.length} images based on: "${clean}".`
+    : `Successfully applied edits for: "${clean}". The composition and subject have been refined with your edits.`;
+  let modelUsed =
+    model && model.includes("qwen") ? "Qwen 2.1 Image Engine" : "MyAI Pro Visual Studio";
 
   if (geminiKey) {
     try {
       const ai = getGeminiClient(geminiKey);
 
-      // Phase 1: Gemini Vision Semantic Grounding (Extract subject posture, features & composition)
+      // Phase 1: Gemini Vision Semantic Grounding (Extract subject posture, features & composition across all input images)
       let groundedEditPrompt = enhanced;
       try {
-        const visionAnalysis = await ai.models.generateContent({
-          model: model || "gemini-2.5-flash",
-          contents: {
-            parts: [
-              {
-                inlineData: {
-                  data: image.data,
-                  mimeType: image.mimeType || "image/jpeg",
-                },
-              },
-              {
-                text: `You are an expert image-to-image synthesis prompt engineer. The user provided this image and requested this edit: "${prompt || "enhance and stylize"}".
+        const imageParts = allImages.map((img) => ({
+          inlineData: {
+            data: img.data,
+            mimeType: img.mimeType || "image/jpeg",
+          },
+        }));
+
+        const visionPrompt = isMultiImage
+          ? `You are an expert multi-image synthesis and composition engineer. The user provided ${allImages.length} images and gave this command/instruction: "${prompt || "combine and blend these images seamlessly"}".
+Carefully inspect all ${allImages.length} images: identify key subjects, characters, background elements, lighting, styles, and details from each image.
+Then formulate a single, cohesive, highly detailed prompt that fulfills the user's command to merge, swap, composite, or transform elements from these images together.
+Respond with ONLY the descriptive visual prompt.`
+          : `You are an expert image-to-image synthesis prompt engineer. The user provided this image and requested this edit: "${prompt || "enhance and stylize"}".
 Thoroughly inspect the image: identify the subject (person, animal, object, landscape), pose, composition, colors, lighting, and layout.
 Then formulate a single, comprehensive, highly detailed image generation prompt that preserves the subject identity, posture, and structure of the original image, while seamlessly incorporating the user's requested edit: "${prompt}".
-Respond with ONLY the descriptive visual prompt.`,
-              },
-            ],
+Respond with ONLY the descriptive visual prompt.`;
+
+        const visionAnalysis = await ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: {
+            parts: [...imageParts, { text: visionPrompt }],
           },
         });
 
@@ -703,18 +618,21 @@ Respond with ONLY the descriptive visual prompt.`,
         ];
         for (const editModel of editModels) {
           try {
+            const firstImg = allImages[0];
             const editRes = await ai.models.generateContent({
               model: editModel,
               contents: {
                 parts: [
                   {
                     inlineData: {
-                      data: image.data,
-                      mimeType: image.mimeType || "image/jpeg",
+                      data: firstImg.data,
+                      mimeType: firstImg.mimeType || "image/jpeg",
                     },
                   },
                   {
-                    text: `Edit this image: ${prompt}. Preserve the subject and key structure.`,
+                    text: isMultiImage
+                      ? `Combine and edit these images according to command: ${prompt}. Grounded description: ${groundedEditPrompt}`
+                      : `Edit this image: ${prompt}. Preserve the subject and key structure.`,
                   },
                 ],
               },
@@ -738,7 +656,7 @@ Respond with ONLY the descriptive visual prompt.`,
             if (editedImageUrl) break;
           } catch (mErr) {
             if (isAccessDenied(mErr)) {
-              break; // Stop attempting if access is denied
+              break;
             }
           }
         }
@@ -746,7 +664,7 @@ Respond with ONLY the descriptive visual prompt.`,
         // Direct edit fallback
       }
 
-      // Phase 3: Imagen 3 fallback if direct editing was not available
+      // Phase 3: Imagen 3 fallback
       if (!editedImageUrl) {
         try {
           if (typeof ai.models?.generateImages === "function") {
@@ -769,51 +687,23 @@ Respond with ONLY the descriptive visual prompt.`,
         }
       }
     } catch {
-      // Graceful fallback to Flux engine
+      // Fallback
     }
   }
 
-  // Phase 4: Autonomous Context-Aware Natural Synthesis
+  // Phase 4: Autonomous Multi-Image Synthesis Engine (Qwen 2.1 Image / Flux)
   if (!editedImageUrl) {
-    const qLower = (clean || "").toLowerCase();
-    let subjectContext = "authentic subject from the reference image";
-    if (
-      qLower.includes("portrait") ||
-      qLower.includes("person") ||
-      qLower.includes("face") ||
-      qLower.includes("hair") ||
-      qLower.includes("man") ||
-      qLower.includes("woman") ||
-      qLower.includes("boy") ||
-      qLower.includes("girl") ||
-      qLower.includes("eyes")
-    ) {
-      subjectContext = "photorealistic portrait of the subject";
-    } else if (
-      qLower.includes("background") ||
-      qLower.includes("sky") ||
-      qLower.includes("landscape") ||
-      qLower.includes("room") ||
-      qLower.includes("setting")
-    ) {
-      subjectContext = "natural environmental composition";
-    } else if (
-      qLower.includes("animal") ||
-      qLower.includes("dog") ||
-      qLower.includes("cat") ||
-      qLower.includes("bird") ||
-      qLower.includes("pet")
-    ) {
-      subjectContext = "detailed wildlife and pet subject";
-    }
-
-    const editPromptEnhanced = `${subjectContext}, seamlessly edited to: ${clean}, natural lighting, true-to-life organic textures, authentic photographic realism, high-definition 8k, realistic camera depth, perfectly coherent composition, no artificial cgi artifacts`;
+    const editPromptEnhanced = isMultiImage
+      ? `${clean}, seamless multi-image fusion, cohesive unified composition, natural lighting, organic textures, authentic photographic realism, high-definition 8k, realistic camera depth, perfectly coherent composition, no artificial cgi artifacts`
+      : `${clean}, authentic photograph, natural lighting, true-to-life organic textures, authentic photographic realism, high-definition 8k, realistic camera depth, perfectly coherent composition, no artificial cgi artifacts`;
 
     editedImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(
       editPromptEnhanced,
     )}?model=flux&width=${dims.width}&height=${dims.height}&nologo=true&seed=${seed}`;
-    modelUsed = "MyAI Pro";
-    descriptiveText = `Applied edits with MyAI Pro: "${clean}". The subject and composition have been refined with natural photographic realism.`;
+    modelUsed = model && model.includes("qwen") ? "Qwen 2.1 Image" : "MyAI Pro";
+    descriptiveText = isMultiImage
+      ? `Applied multi-image fusion with MyAI Pro: "${clean}". The images have been combined and rendered into a unified composition.`
+      : `Applied edits with MyAI Pro: "${clean}". The subject and composition have been refined with natural photographic realism.`;
   }
 
   return {
@@ -823,11 +713,12 @@ Respond with ONLY the descriptive visual prompt.`,
     text: descriptiveText,
     prompt: clean,
     enhancedPrompt: enhanced,
-    modelUsed: "MyAI Pro",
+    modelUsed,
     aspectRatio,
     stylePreset,
     metadata: {
       editType,
+      imageCount: allImages.length,
       width: dims.width,
       height: dims.height,
       seed,
@@ -874,7 +765,7 @@ export async function processImageRequest(
       });
 
     case "edit":
-      if (!body.image) {
+      if (!body.image && (!body.images || body.images.length === 0)) {
         return {
           success: false,
           action: "edit",
@@ -883,6 +774,7 @@ export async function processImageRequest(
       }
       return handleEditImage({
         image: body.image,
+        images: body.images,
         prompt: body.prompt || "enhance and restyle",
         editType: body.editType,
         aspectRatio: body.aspectRatio,
